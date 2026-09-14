@@ -30,9 +30,7 @@
     .bottom { position:relative; z-index:1; display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:28px; }
     .status { display:inline-flex; align-items:center; gap:8px; color:#556070; font-size:13px; font-weight:750; }
     .dot { width:8px; height:8px; border-radius:50%; background:#34d399; box-shadow:0 0 0 5px rgba(52,211,153,.12); }
-    .dot.shopping-waiting { background:#f59e0b; box-shadow:0 0 0 5px rgba(245,158,11,.12); }
     .go { width:42px; height:42px; border-radius:14px; display:grid; place-items:center; background:#111827; color:#fff; font-size:20px; font-weight:800; }
-    .disabled { cursor:default; } .disabled .go { background:#eef0f5; color:#9ca3af; font-size:12px; width:auto; padding:0 14px; }
     footer { color:#9aa1ad; text-align:center; font-size:12px; margin-top:30px; }
     @media (max-width:980px) { .grid { grid-template-columns:1fr 1fr; } }
     @media (max-width:720px) { .wrap{width:min(100% - 22px,1120px);padding-top:18px} header{margin-bottom:42px}.today{font-size:12px}.brand{font-size:17px}.brand-mark{width:38px;height:38px;border-radius:12px}.hero{margin-bottom:26px} h1{font-size:clamp(42px,13vw,60px)}.lead{font-size:17px}.grid{grid-template-columns:1fr;gap:14px}.card{min-height:235px;padding:22px;border-radius:23px}.card h2{font-size:28px} }
@@ -45,7 +43,7 @@
     <section class="grid" aria-label="Aplikace Haneva">
       <a class="card budget" href="/rozpocet/" aria-label="Otevřít Rozpočet domácnosti"><div class="card-content"><div class="icon">💰</div><h2>Rozpočet</h2><p>Příjmy, osobní a společné výdaje i přehled toho, co nám v měsíci zbývá.</p></div><div class="bottom"><span class="status"><span class="dot"></span>Aktivní</span><span class="go">→</span></div></a>
       <a class="card calendar" href="/kalendar" aria-label="Otevřít společný kalendář"><div class="card-content"><div class="icon">📅</div><h2>Kalendář</h2><p>Hanych, Eva, společné akce, narozeniny a všechno, na co nechceme zapomenout.</p></div><div class="bottom"><span class="status"><span class="dot"></span>Aktivní</span><span class="go">→</span></div></a>
-      <article class="card shopping disabled" aria-label="Nákupy se připravují"><div class="card-content"><div class="icon">🛒</div><h2>Nákupy</h2><p>Společný nákupní seznam na jídlo, drogerii a další věci, které je potřeba doma dokoupit.</p></div><div class="bottom"><span class="status"><span class="dot shopping-waiting"></span>Připravujeme</span><span class="go">BRZY</span></div></article>
+      <a class="card shopping" href="/nakupy" aria-label="Otevřít nákupní seznam"><div class="card-content"><div class="icon">🛒</div><h2>Nákupy</h2><p>Společný seznam a akce z Lidlu a Albertu podle toho, co často kupujeme.</p></div><div class="bottom"><span class="status"><span class="dot"></span>Aktivní</span><span class="go">→</span></div></a>
     </section>
     <footer>Haneva Home · běží doma na Raspberry Pi</footer>
   </main>
