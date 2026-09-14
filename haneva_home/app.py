@@ -115,7 +115,7 @@ HTML = r'''<!doctype html>
 
     .grid {
       display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 18px;
     }
 
@@ -157,6 +157,7 @@ HTML = r'''<!doctype html>
 
     .budget::after { background: rgba(110,231,183,.32); }
     .calendar::after { background: rgba(167,139,250,.28); }
+    .shopping::after { background: rgba(251,191,36,.24); }
 
     .icon {
       width: 58px;
@@ -218,6 +219,11 @@ HTML = r'''<!doctype html>
       box-shadow: 0 0 0 5px rgba(167,139,250,.12);
     }
 
+    .dot.shopping-waiting {
+      background: #f59e0b;
+      box-shadow: 0 0 0 5px rgba(245,158,11,.12);
+    }
+
     .go {
       width: 42px;
       height: 42px;
@@ -244,6 +250,10 @@ HTML = r'''<!doctype html>
       text-align: center;
       font-size: 12px;
       margin-top: 30px;
+    }
+
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     }
 
     @media (max-width: 720px) {
@@ -298,6 +308,18 @@ HTML = r'''<!doctype html>
         </div>
         <div class="bottom">
           <span class="status"><span class="dot waiting"></span>Připravujeme</span>
+          <span class="go">BRZY</span>
+        </div>
+      </article>
+
+      <article class="card shopping disabled" aria-label="Nákupní seznam se připravuje">
+        <div class="card-content">
+          <div class="icon">🛒</div>
+          <h2>Nákupy</h2>
+          <p>Společný seznam na jídlo a běžné nákupy. Přidáme, co dochází, a v obchodě jen odškrtáváme.</p>
+        </div>
+        <div class="bottom">
+          <span class="status"><span class="dot shopping-waiting"></span>Připravujeme</span>
           <span class="go">BRZY</span>
         </div>
       </article>
