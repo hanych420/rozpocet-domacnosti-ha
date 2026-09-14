@@ -13,5 +13,6 @@ COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
 COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
+COPY app-icon-v3.png /app/app-icon-v3.png
 
 CMD ["sh", "-c", "python3 /app/seed_holidays.py && exec python3 /app/icon_gateway.py"]
