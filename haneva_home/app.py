@@ -6,11 +6,14 @@ import os
 import re
 import sqlite3
 
+import shopping
+
 HOST = "0.0.0.0"
 PORT = 8100
 DB_PATH = "/data/calendar.db"
 HOME_HTML_PATH = "/app/home.html"
 CALENDAR_HTML_PATH = "/app/calendar.html"
+SHOPPING_HTML_PATH = "/app/shopping.html"
 ALLOWED_CALENDARS = {"hanych", "eva", "spolecne", "narozeniny", "kumi"}
 DEFAULT_COLORS = {
     "hanych": "#60a5fa",
@@ -57,6 +60,7 @@ def init_db():
             )
         ''')
         conn.commit()
+    shopping.init_db()
 
 
 def valid_date(value):
@@ -201,7 +205,7 @@ def read_page(path):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HanevaHome/0.3.2"
+    server_version = "HanevaHome/0.5.0"
 
     def send_common_headers(self, status=200, content_type="text/html; charset=utf-8", length=None):
         self.send_response(status)
@@ -215,7 +219,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def send_bytes(self, body, status=200, content_type="text/html; charset=utf-8"):
         self.send_common_headers(status, content_type, len(body))
-        self.wfile.write(body)
+        if self.command != "HEAD":
+            self.wfile.write(body)
 
     def send_json(self, payload, status=200):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -230,6 +235,12 @@ class Handler(BaseHTTPRequestHandler):
             return {}
         return json.loads(self.rfile.read(length).decode("utf-8"))
 
+    def _send_page(self, page_path, missing_message):
+        try:
+            self.send_bytes(read_page(page_path))
+        except OSError:
+            self.send_bytes((missing_message + "\n").encode("utf-8"), 500, "text/plain; charset=utf-8")
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -238,17 +249,15 @@ class Handler(BaseHTTPRequestHandler):
             self.send_bytes(b"ok\n", 200, "text/plain; charset=utf-8")
             return
         if path in ("/", "/index.html"):
-            try:
-                self.send_bytes(read_page(HOME_HTML_PATH))
-            except OSError:
-                self.send_bytes(b"Home page not found\n", 500, "text/plain; charset=utf-8")
+            self._send_page(HOME_HTML_PATH, "Home page not found")
             return
         if path in ("/kalendar", "/kalendar/"):
-            try:
-                self.send_bytes(read_page(CALENDAR_HTML_PATH))
-            except OSError:
-                self.send_bytes(b"Calendar page not found\n", 500, "text/plain; charset=utf-8")
+            self._send_page(CALENDAR_HTML_PATH, "Calendar page not found")
             return
+        if path in ("/nakupy", "/nakupy/"):
+            self._send_page(SHOPPING_HTML_PATH, "Shopping page not found")
+            return
+
         if path == "/api/settings/colors":
             self.send_json({"colors": get_colors(), "defaults": DEFAULT_COLORS})
             return
@@ -275,54 +284,82 @@ class Handler(BaseHTTPRequestHandler):
                 return
             self.send_json({"event": row_to_event(row)})
             return
+
+        if path == "/api/shopping/state":
+            self.send_json(shopping.get_state())
+            return
+        if path == "/api/shopping/deals":
+            query = parse_qs(parsed.query)
+            force = query.get("refresh", ["0"])[0] in {"1", "true", "yes"}
+            self.send_json(shopping.get_deals(force=force))
+            return
+
         self.send_bytes(b"Not found\n", 404, "text/plain; charset=utf-8")
 
     def do_POST(self):
-        if urlparse(self.path).path != "/api/events":
-            self.send_json({"error": "Not found"}, 404)
-            return
+        path = urlparse(self.path).path
         try:
-            event = normalize_event(self.read_json())
-            with db() as conn:
-                cur = conn.execute(
-                    '''INSERT INTO events
-                    (title, calendar, start_date, end_date, start_time, end_time, all_day, location, notes, recurrence)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                    (event["title"], event["calendar"], event["start_date"], event["end_date"], event["start_time"],
-                     event["end_time"], event["all_day"], event["location"], event["notes"], event["recurrence"]),
-                )
-                event_id = cur.lastrowid
-                conn.commit()
-                row = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-            self.send_json({"event": row_to_event(row)}, 201)
+            if path == "/api/events":
+                event = normalize_event(self.read_json())
+                with db() as conn:
+                    cur = conn.execute(
+                        '''INSERT INTO events
+                        (title, calendar, start_date, end_date, start_time, end_time, all_day, location, notes, recurrence)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                        (event["title"], event["calendar"], event["start_date"], event["end_date"], event["start_time"],
+                         event["end_time"], event["all_day"], event["location"], event["notes"], event["recurrence"]),
+                    )
+                    event_id = cur.lastrowid
+                    conn.commit()
+                    row = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+                self.send_json({"event": row_to_event(row)}, 201)
+                return
+            if path == "/api/shopping/items":
+                self.send_json({"item": shopping.add_item(self.read_json())}, 201)
+                return
+            if path == "/api/shopping/watch":
+                self.send_json(shopping.set_watched(self.read_json()))
+                return
+            if path == "/api/shopping/clear-completed":
+                self.send_json({"deleted": shopping.clear_completed()})
+                return
+            self.send_json({"error": "Not found"}, 404)
         except (ValueError, json.JSONDecodeError) as exc:
             self.send_json({"error": str(exc)}, 400)
 
     def do_PUT(self):
         path = urlparse(self.path).path
-
-        if path == "/api/settings/colors":
-            try:
+        try:
+            if path == "/api/settings/colors":
                 colors = save_colors(self.read_json())
                 self.send_json({"colors": colors, "defaults": DEFAULT_COLORS})
-            except (ValueError, json.JSONDecodeError) as exc:
-                self.send_json({"error": str(exc)}, 400)
-            return
-
-        if not path.startswith("/api/events/"):
-            self.send_json({"error": "Not found"}, 404)
-            return
-        try:
-            event_id = int(path.rsplit("/", 1)[1])
-        except ValueError:
-            self.send_json({"error": "Neplatné ID."}, 400)
-            return
-        with db() as conn:
-            existing = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-        if not existing:
-            self.send_json({"error": "Událost nebyla nalezena."}, 404)
-            return
-        try:
+                return
+            if path.startswith("/api/shopping/items/"):
+                try:
+                    item_id = int(path.rsplit("/", 1)[1])
+                except ValueError:
+                    self.send_json({"error": "Neplatné ID."}, 400)
+                    return
+                try:
+                    item = shopping.update_item(item_id, self.read_json())
+                except KeyError as exc:
+                    self.send_json({"error": str(exc.args[0])}, 404)
+                    return
+                self.send_json({"item": item})
+                return
+            if not path.startswith("/api/events/"):
+                self.send_json({"error": "Not found"}, 404)
+                return
+            try:
+                event_id = int(path.rsplit("/", 1)[1])
+            except ValueError:
+                self.send_json({"error": "Neplatné ID."}, 400)
+                return
+            with db() as conn:
+                existing = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
+            if not existing:
+                self.send_json({"error": "Událost nebyla nalezena."}, 404)
+                return
             event = normalize_event(self.read_json(), existing)
             with db() as conn:
                 conn.execute(
@@ -339,6 +376,19 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = urlparse(self.path).path
+        if path.startswith("/api/shopping/items/"):
+            try:
+                item_id = int(path.rsplit("/", 1)[1])
+            except ValueError:
+                self.send_json({"error": "Neplatné ID."}, 400)
+                return
+            try:
+                shopping.delete_item(item_id)
+            except KeyError as exc:
+                self.send_json({"error": str(exc.args[0])}, 404)
+                return
+            self.send_json({"ok": True})
+            return
         if not path.startswith("/api/events/"):
             self.send_json({"error": "Not found"}, 404)
             return
@@ -357,7 +407,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         path = urlparse(self.path).path
-        if path in ("/", "/index.html", "/kalendar", "/kalendar/", "/health"):
+        if path in ("/", "/index.html", "/kalendar", "/kalendar/", "/nakupy", "/nakupy/", "/health"):
             self.send_common_headers(200, "text/html; charset=utf-8", 0)
         else:
             self.send_common_headers(404, "text/plain; charset=utf-8", 0)
