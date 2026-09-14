@@ -68,6 +68,7 @@
     .event.kumi{background:var(--kumi-bg);border-left:3px solid var(--kumi)}
     .event.dragging{opacity:.42;transform:scale(.98)}
     .more{border:0;background:transparent;color:#6b7280;padding:4px 2px;font-size:11px;font-weight:750}
+    .more:hover{color:#111827}
 
     .agenda{padding:10px 18px 18px;display:none}
     .agenda.active{display:block}
@@ -90,7 +91,7 @@
     .modal{padding:24px;overflow:auto;max-height:calc(100vh - 30px)}
     .modal-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px}
     .modal-head h2{margin:0;font-size:25px;letter-spacing:-.03em}
-    .close{border:0;background:#f3f4f6;width:36px;height:36px;border-radius:11px;font-size:18px}
+    .close{border:0;background:#f3f4f6;width:36px;height:36px;border-radius:11px;font-size:18px;display:grid;place-items:center;flex:0 0 auto}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
     .field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}
     .field label{font-size:12px;font-weight:800;color:#606979}
@@ -121,11 +122,26 @@
       .toolbar{padding:13px}.nav{width:100%;justify-content:space-between}.month-title{min-width:0;flex:1;font-size:18px}.view-toggle{width:100%}.view-toggle button{flex:1}
       .filters{padding:11px 13px;overflow-x:auto;flex-wrap:nowrap}.filter{flex:0 0 auto}
       .gesture-hint{padding:8px 13px;font-size:11px}.weekdays div{padding:8px 2px;text-align:center;font-size:10px}.day{min-height:82px;padding:4px}.day-number{width:24px;height:24px;font-size:11px;margin-bottom:2px}
-      .event{font-size:9px;padding:3px 4px;margin-top:3px;border-radius:6px}.more{font-size:9px;padding:2px 0}
+      .event{font-size:9px;padding:3px 4px;margin-top:3px;border-radius:6px}.more{font-size:9px;padding:3px 0}
       .agenda{padding:8px 10px 14px}.agenda-event{padding:9px 9px;gap:8px}.agenda-date-range{width:86px;font-size:11px}.agenda-title{font-size:13px}.agenda-meta{font-size:11px}
       .settings-row{padding-right:2px}.settings-button{font-size:10px}
-      .form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.modal{padding:18px}.actions{align-items:stretch;flex-direction:column}.danger{width:100%}.actions-right{width:100%;margin-left:0}.actions-right button{flex:1}
+      .form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}
       .color-row{grid-template-columns:1fr auto}.color-hex{display:none}.settings-actions{align-items:stretch;flex-direction:column}.settings-actions-right{width:100%}.settings-actions-right button{flex:1}
+
+      #eventDialog{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;padding:0;border-radius:0;inset:0;box-shadow:none;background:#fff}
+      #eventDialog::backdrop{background:rgba(15,23,42,.28)}
+      #eventDialog .modal{height:100dvh;max-height:none;padding:0;overflow:hidden;display:flex;flex-direction:column;background:#fff}
+      #eventDialog .modal-head{margin:0;padding:calc(14px + env(safe-area-inset-top)) 16px 14px;border-bottom:1px solid var(--line);background:#fff;flex:0 0 auto;position:relative;z-index:3}
+      #eventDialog .modal-head h2{font-size:22px}
+      #eventDialog .close{width:40px;height:40px;border-radius:13px;font-size:21px}
+      #eventDialog .form-grid{display:grid;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;flex:1 1 auto;min-height:0;padding:16px 16px 24px;align-content:start;background:#f8fafc}
+      #eventDialog .field input,#eventDialog .field select,#eventDialog .field textarea{background:#fff;font-size:16px;min-height:46px}
+      #eventDialog .field textarea{min-height:96px}
+      #eventDialog .actions{margin:0;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px rgba(15,23,42,.06);display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;flex:0 0 auto;position:relative;z-index:3}
+      #eventDialog .danger{width:auto;min-height:46px}
+      #eventDialog .actions-right{width:100%;margin:0;display:grid;grid-template-columns:1fr 1.25fr;gap:8px}
+      #eventDialog .actions-right button{min-height:46px;width:100%}
+      #eventDialog .save{font-size:16px}
     }
   </style>
 </head>
@@ -158,7 +174,7 @@
   </main>
 
   <dialog id="eventDialog"><form class="modal" id="eventForm">
-    <div class="modal-head"><h2 id="modalTitle">Nová událost</h2><button class="close" type="button" id="closeDialog">×</button></div>
+    <div class="modal-head"><h2 id="modalTitle">Nová událost</h2><button class="close" type="button" id="closeDialog" aria-label="Zavřít">×</button></div>
     <div class="form-grid">
       <div class="field full"><label for="title">Název</label><input id="title" required maxlength="200" placeholder="Např. koncert, návštěva, zubař…"></div>
       <div class="field"><label for="calendar">Kalendář</label><select id="calendar"><option value="hanych">Hanych</option><option value="eva">Eva</option><option value="spolecne" selected>Společné</option><option value="narozeniny">Narozeniny</option><option value="kumi">🐕 Hlídání Kumi</option></select></div>
@@ -171,7 +187,7 @@
       <div class="field full"><label for="location">Místo</label><input id="location" maxlength="250" placeholder="Volitelné"></div>
       <div class="field full"><label for="notes">Poznámka</label><textarea id="notes" maxlength="2000" placeholder="Volitelné"></textarea></div>
     </div>
-    <div class="actions"><button class="danger" type="button" id="deleteEvent">Smazat událost</button><div class="actions-right"><button class="secondary" type="button" id="cancelDialog">Zrušit</button><button class="save" type="submit">Uložit</button></div></div>
+    <div class="actions"><button class="danger" type="button" id="deleteEvent">Smazat</button><div class="actions-right"><button class="secondary" type="button" id="cancelDialog">Zrušit</button><button class="save" type="submit">Uložit</button></div></div>
   </form></dialog>
 
   <dialog id="settingsDialog">
@@ -193,18 +209,18 @@
     const calendarNames={hanych:'Hanych',eva:'Eva',spolecne:'Společné',narozeniny:'Narozeniny',kumi:'🐕 Hlídání Kumi'};
     const allCalendars=['hanych','eva','spolecne','narozeniny','kumi'];
     const defaultColors={hanych:'#60a5fa',eva:'#c084fc',spolecne:'#34d399',narozeniny:'#fb923c',kumi:'#6b7280'};
-    const isMobile=window.matchMedia('(max-width: 760px)').matches;
     const state={
       cursor:new Date(new Date().getFullYear(),new Date().getMonth(),1),
       events:[],
       filters:new Set(allCalendars),
       filterMode:'all',
-      view:isMobile?'agenda':'month',
+      view:'month',
       editingId:null,
       autoBirthdayRecurrence:false,
       autoKumiTitle:false,
       suppressClickUntil:0,
-      colors:{...defaultColors}
+      colors:{...defaultColors},
+      expandedDays:new Set()
     };
     const mouseGesture={kind:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
     const touchGesture={kind:null,timer:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
@@ -325,7 +341,9 @@
         cell.appendChild(number);
 
         const dayEvents=eventsForDay(d);
-        dayEvents.slice(0,3).forEach(event=>{
+        const expanded=state.expandedDays.has(dateKey);
+        const shownEvents=expanded?dayEvents:dayEvents.slice(0,3);
+        shownEvents.forEach(event=>{
           const btn=document.createElement('button');
           btn.type='button';
           btn.className=`event ${event.calendar}`;
@@ -338,8 +356,13 @@
           const more=document.createElement('button');
           more.type='button';
           more.className='more';
-          more.textContent=`+ ${dayEvents.length-3} další`;
-          more.addEventListener('click',ev=>{ev.stopPropagation();state.view='agenda';render()});
+          more.textContent=expanded?'− Skrýt':`+ ${dayEvents.length-3} další`;
+          more.setAttribute('aria-expanded',expanded?'true':'false');
+          more.addEventListener('click',ev=>{
+            ev.stopPropagation();
+            if(state.expandedDays.has(dateKey))state.expandedDays.delete(dateKey);else state.expandedDays.add(dateKey);
+            renderGrid();
+          });
           cell.appendChild(more);
         }
         bindDayInteractions(cell);
@@ -548,7 +571,7 @@
       $('startDate').value=start;
       $('endDate').value=end;
       $('eventDialog').showModal();
-      setTimeout(()=>$('title').focus(),30);
+      if(window.matchMedia('(min-width: 761px)').matches)setTimeout(()=>$('title').focus(),30);
     }
 
     async function openEdit(event){
@@ -658,9 +681,9 @@
     }
 
     $('newEvent').addEventListener('click',()=>openNew());
-    $('prevMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()-1);loadEvents()});
-    $('nextMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()+1);loadEvents()});
-    $('todayButton').addEventListener('click',()=>{const n=new Date();state.cursor=new Date(n.getFullYear(),n.getMonth(),1);loadEvents()});
+    $('prevMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()-1);state.expandedDays.clear();loadEvents()});
+    $('nextMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()+1);state.expandedDays.clear();loadEvents()});
+    $('todayButton').addEventListener('click',()=>{const n=new Date();state.cursor=new Date(n.getFullYear(),n.getMonth(),1);state.expandedDays.clear();loadEvents()});
 
     $('filters').addEventListener('click',e=>{
       const btn=e.target.closest('.filter');
@@ -683,6 +706,7 @@
           state.filterMode='all';
         }
       }
+      state.expandedDays.clear();
       render();
     });
 
