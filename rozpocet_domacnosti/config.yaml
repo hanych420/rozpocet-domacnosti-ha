@@ -1,5 +1,5 @@
 name: "Rozpočet domácnosti"
-version: "0.6.1"
+version: "0.6.2"
 slug: "rozpocet_domacnosti"
 description: "Soukromý web pro domácí rozpočet s lokální SQLite databází."
 init: false
