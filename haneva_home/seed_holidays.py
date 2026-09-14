@@ -2,23 +2,23 @@ from datetime import date, timedelta
 
 import app
 
-MARKER_PREFIX = "__system_cz_holiday__"
+SYSTEM_NOTE = "Automaticky přidaný den pracovního klidu v ČR."
 ANCHOR_YEAR = 2026
 EASTER_START_YEAR = 2020
 EASTER_END_YEAR = 2100
 
 FIXED_HOLIDAYS = [
-    (1, 1, "🇨🇿 Nový rok / Den obnovy ČR", "new_year"),
-    (5, 1, "🇨🇿 Svátek práce", "labour_day"),
-    (5, 8, "🇨🇿 Den vítězství", "victory_day"),
-    (7, 5, "🇨🇿 Cyril a Metoděj", "cyril_methodius"),
-    (7, 6, "🇨🇿 Jan Hus", "jan_hus"),
-    (9, 28, "🇨🇿 Den české státnosti", "statehood"),
-    (10, 28, "🇨🇿 Den vzniku Československa", "czechoslovakia"),
-    (11, 17, "🇨🇿 17. listopad", "november_17"),
-    (12, 24, "🎄 Štědrý den", "christmas_eve"),
-    (12, 25, "🎄 1. svátek vánoční", "christmas_day"),
-    (12, 26, "🎄 2. svátek vánoční", "boxing_day"),
+    (1, 1, "🇨🇿 Nový rok / Den obnovy ČR"),
+    (5, 1, "🇨🇿 Svátek práce"),
+    (5, 8, "🇨🇿 Den vítězství"),
+    (7, 5, "🇨🇿 Cyril a Metoděj"),
+    (7, 6, "🇨🇿 Jan Hus"),
+    (9, 28, "🇨🇿 Den české státnosti"),
+    (10, 28, "🇨🇿 Den vzniku Československa"),
+    (11, 17, "🇨🇿 17. listopad"),
+    (12, 24, "🎄 Štědrý den"),
+    (12, 25, "🎄 1. svátek vánoční"),
+    (12, 26, "🎄 2. svátek vánoční"),
 ]
 
 
@@ -41,44 +41,36 @@ def easter_sunday(year):
     return date(year, month, day)
 
 
-def insert_event(conn, title, day, marker, recurrence="none"):
+def insert_event(conn, title, day, recurrence="none"):
     day_s = day.isoformat()
     conn.execute(
         '''INSERT INTO events
         (title, calendar, start_date, end_date, start_time, end_time, all_day, location, notes, recurrence)
         VALUES (?, 'spolecne', ?, ?, '', '', 1, '', ?, ?)''',
-        (title, day_s, day_s, f"{MARKER_PREFIX}:{marker}", recurrence),
+        (title, day_s, day_s, SYSTEM_NOTE, recurrence),
     )
 
 
 def seed():
     app.init_db()
     with app.db() as conn:
-        conn.execute("DELETE FROM events WHERE notes LIKE ?", (f"{MARKER_PREFIX}:%",))
+        # Regenerate only our automatic holiday rows on every add-on start.
+        conn.execute("DELETE FROM events WHERE notes = ?", (SYSTEM_NOTE,))
 
-        for month, day, title, key in FIXED_HOLIDAYS:
+        # Fixed-date holidays can use the calendar's built-in yearly recurrence.
+        for month, day, title in FIXED_HOLIDAYS:
             insert_event(
                 conn,
                 title,
                 date(ANCHOR_YEAR, month, day),
-                key,
                 recurrence="yearly",
             )
 
+        # Good Friday and Easter Monday move every year, so seed their actual dates.
         for year in range(EASTER_START_YEAR, EASTER_END_YEAR + 1):
             easter = easter_sunday(year)
-            insert_event(
-                conn,
-                "🇨🇿 Velký pátek",
-                easter - timedelta(days=2),
-                f"good_friday_{year}",
-            )
-            insert_event(
-                conn,
-                "🇨🇿 Velikonoční pondělí",
-                easter + timedelta(days=1),
-                f"easter_monday_{year}",
-            )
+            insert_event(conn, "🇨🇿 Velký pátek", easter - timedelta(days=2))
+            insert_event(conn, "🇨🇿 Velikonoční pondělí", easter + timedelta(days=1))
 
         conn.commit()
 
