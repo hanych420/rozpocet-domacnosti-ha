@@ -34,16 +34,18 @@ TEXT_TYPES = (
 
 BUDGET_HOME_CSS = """
 <style id="haneva-budget-home-style">
-.haneva-budget-homebar{position:sticky;top:0;z-index:99999;display:flex;align-items:center;padding:10px 14px;background:rgba(255,255,255,.94);border-bottom:1px solid #e8ebf2;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
-.haneva-budget-home{display:inline-flex;align-items:center;gap:10px;color:#172033!important;text-decoration:none!important;font-size:15px;font-weight:800;line-height:1}
-.haneva-budget-home-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#111827;color:#fff;font-size:15px;font-weight:850;box-shadow:0 7px 18px rgba(17,24,39,.15)}
-.haneva-budget-home:hover{opacity:.82}
-@media(max-width:760px){.haneva-budget-homebar{padding:8px 10px}.haneva-budget-home-mark{width:32px;height:32px;border-radius:10px}.haneva-budget-home{font-size:14px}}
+.haneva-budget-navwrap{width:min(1240px,calc(100% - 28px));margin:0 auto;padding:22px 0 0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.haneva-budget-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}
+.haneva-budget-brand{display:flex;align-items:center;gap:12px;color:#172033!important;text-decoration:none!important;font-weight:800;line-height:1}
+.haneva-budget-brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:#111827;color:#fff;font-size:16px;font-weight:850}
+.haneva-budget-back{display:inline-flex;align-items:center;gap:8px;color:#596174!important;text-decoration:none!important;font-size:14px;font-weight:700}
+.haneva-budget-brand:hover,.haneva-budget-back:hover{opacity:.82}
+@media(max-width:760px){.haneva-budget-navwrap{width:min(100% - 18px,1240px);padding-top:14px}.haneva-budget-topbar{margin-bottom:22px}.haneva-budget-brand-mark{width:40px;height:40px;border-radius:13px}.haneva-budget-back{font-size:12px}}
 </style>
 """
 
 BUDGET_HOME_HTML = """
-<div class="haneva-budget-homebar" id="haneva-budget-homebar"><a class="haneva-budget-home" href="https://haneva.cz/" aria-label="Zpět na hlavní menu Haneva"><span class="haneva-budget-home-mark">H</span><span>Haneva</span></a></div>
+<div class="haneva-budget-navwrap" id="haneva-budget-homebar"><div class="haneva-budget-topbar"><a class="haneva-budget-brand" href="/" aria-label="Zpět na hlavní menu Haneva"><span class="haneva-budget-brand-mark">H</span><span>Haneva</span></a><a class="haneva-budget-back" href="/">← Zpět na přehled</a></div></div>
 """
 
 
@@ -61,28 +63,23 @@ def rewrite_budget_text(text):
     text = text.replace("http://rozpocet.haneva.cz/", "/rozpocet/")
     text = text.replace("https://haneva.cz/rozpocet/rozpocet/", "/rozpocet/")
 
-    # Root-relative URLs in HTML and JavaScript strings.
     text = re.sub(
         r"([\"'`])/(?!/|rozpocet(?:/|[\"'`]))",
         r"\1/rozpocet/",
         text,
     )
-    # CSS url(/asset.ext)
     text = re.sub(
         r"url\(\s*/(?!/|rozpocet/)",
         "url(/rozpocet/",
         text,
         flags=re.IGNORECASE,
     )
-    # Rare unquoted HTML attributes: href=/foo
     text = re.sub(
         r"(?i)\b(href|src|action)=/(?!/|rozpocet/)",
         r"\1=/rozpocet/",
         text,
     )
 
-    # Inject the Haneva home link only into actual HTML documents, after URL rewriting
-    # so the absolute homepage link remains https://haneva.cz/.
     return add_budget_home_link(text)
 
 
@@ -101,7 +98,7 @@ def rewrite_location(value):
 
 
 class GatewayHandler(app.Handler):
-    server_version = "HanevaHome/0.4.1"
+    server_version = "HanevaHome/0.5.1"
 
     def _request_host(self):
         return (self.headers.get("Host") or "").split(":", 1)[0].lower()

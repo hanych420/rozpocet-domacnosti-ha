@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup
 DB_PATH = "/data/shopping.db"
 KUPI_SEARCH_URL = "https://www.kupi.cz/hledej"
 CACHE_HOURS = 6
-MAX_QUERIES = 8
+MAX_QUERIES = 16
 MAX_RESULTS_PER_QUERY = 6
 ALLOWED_STORES = {"any", "lidl", "albert"}
 USER_AGENT = (
@@ -21,11 +21,61 @@ USER_AGENT = (
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
 
+# Initial profile inferred from the Lidl receipts supplied by the household.
+# The score is only a starting priority for Kupi searches; normal Haneva usage
+# keeps building the real history afterwards. INSERT OR IGNORE makes this seed
+# one-time, so a user can later unwatch an item without it returning on restart.
+RECEIPT_PROFILE = [
+    ("Chléb", 14),
+    ("Kuřecí prsa", 13),
+    ("Kuřecí šunka", 12),
+    ("Eidam", 11),
+    ("Avokádo", 11),
+    ("Tortilla wraps", 10),
+    ("Ovesné vločky", 10),
+    ("Jadel kořeněný", 10),
+    ("Vepřová krkovice", 10),
+    ("Kuřecí paličky", 10),
+    ("Barilla těstoviny", 10),
+    ("Banány", 9),
+    ("Salát ledový", 9),
+    ("Okurka", 9),
+    ("Rajčata", 9),
+    ("Cibule", 8),
+    ("Mrkev", 8),
+    ("Pistácie", 8),
+    ("Tuňák", 8),
+    ("Vejce", 8),
+    ("Ovesný nápoj", 7),
+    ("Bezlaktózové mléko", 7),
+    ("Bílý jogurt bez laktózy", 7),
+    ("Proteinový rohlík", 7),
+    ("Rýže", 6),
+]
+
 
 def db():
     conn = sqlite3.connect(DB_PATH, timeout=10)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def normalize_name(value):
+    value = str(value or "").strip().lower()
+    value = unicodedata.normalize("NFKD", value)
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    value = re.sub(r"\s+", " ", value)
+    return value[:160]
+
+
+def seed_receipt_profile(conn):
+    for display_name, score in RECEIPT_PROFILE:
+        norm = normalize_name(display_name)
+        conn.execute('''
+            INSERT OR IGNORE INTO history
+            (name_norm, display_name, times_added, times_completed, watched, last_added_at, last_completed_at)
+            VALUES (?, ?, 0, ?, 1, NULL, NULL)
+        ''', (norm, display_name, score))
 
 
 def init_db():
@@ -64,15 +114,8 @@ def init_db():
             )
         ''')
         conn.execute("CREATE INDEX IF NOT EXISTS idx_items_checked ON items(checked, created_at)")
+        seed_receipt_profile(conn)
         conn.commit()
-
-
-def normalize_name(value):
-    value = str(value or "").strip().lower()
-    value = unicodedata.normalize("NFKD", value)
-    value = "".join(ch for ch in value if not unicodedata.combining(ch))
-    value = re.sub(r"\s+", " ", value)
-    return value[:160]
 
 
 def _clean(value):
@@ -236,12 +279,12 @@ def set_watched(payload):
 def _candidate_queries():
     result, seen = [], set()
     with db() as conn:
-        active = conn.execute("SELECT name FROM items WHERE checked=0 ORDER BY created_at DESC LIMIT 12").fetchall()
+        active = conn.execute("SELECT name FROM items WHERE checked=0 ORDER BY created_at DESC LIMIT 20").fetchall()
         history = conn.execute('''
             SELECT display_name FROM history
             WHERE watched=1 OR times_completed>=2
             ORDER BY watched DESC, times_completed DESC, times_added DESC
-            LIMIT 12
+            LIMIT 30
         ''').fetchall()
     for row in list(active) + list(history):
         name = _clean(row[0])

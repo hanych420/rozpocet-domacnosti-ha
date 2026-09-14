@@ -13,7 +13,8 @@
       --eva:#c084fc;--eva-bg:#f3e8ff;
       --spolecne:#34d399;--spolecne-bg:#d1fae5;
       --narozeniny:#fb923c;--narozeniny-bg:#ffedd5;
-      --kumi:#6b7280;--kumi-bg:#e5e7eb
+      --kumi:#6b7280;--kumi-bg:#e5e7eb;
+      --svatky:#ef4444;--svatky-bg:#fee2e2
     }
     *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
     body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 0% 0%,rgba(147,197,253,.25),transparent 30rem),radial-gradient(circle at 100% 0%,rgba(216,180,254,.24),transparent 28rem),var(--bg)}
@@ -66,6 +67,7 @@
     .event.spolecne{background:var(--spolecne-bg);border-left:3px solid var(--spolecne)}
     .event.narozeniny{background:var(--narozeniny-bg);border-left:3px solid var(--narozeniny)}
     .event.kumi{background:var(--kumi-bg);border-left:3px solid var(--kumi)}
+    .event.svatky{background:var(--svatky-bg);border-left:3px solid var(--svatky);cursor:default}
     .event.dragging{opacity:.42;transform:scale(.98)}
     .more{border:0;background:transparent;color:#6b7280;padding:4px 2px;font-size:11px;font-weight:750}
     .more:hover{color:#111827}
@@ -193,7 +195,7 @@
   <dialog id="settingsDialog">
     <form class="modal" id="settingsForm">
       <div class="modal-head"><h2>Nastavení kalendáře</h2><button class="close" type="button" id="closeSettings">×</button></div>
-      <p class="settings-intro">Barvy se ukládají společně na Haneva Home, takže budou stejné na telefonu i počítači.</p>
+      <p class="settings-intro">Barvy se ukládají společně na Haneva Home, takže budou stejné na telefonu i počítači. Státní svátky mají vlastní barvu, ale nejsou samostatným filtrem.</p>
       <div class="color-settings" id="colorSettings"></div>
       <div class="settings-actions">
         <button class="secondary" type="button" id="resetColors">Výchozí barvy</button>
@@ -206,9 +208,10 @@
 
   <script>
     const months=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'];
-    const calendarNames={hanych:'Hanych',eva:'Eva',spolecne:'Společné',narozeniny:'Narozeniny',kumi:'🐕 Hlídání Kumi'};
+    const calendarNames={hanych:'Hanych',eva:'Eva',spolecne:'Společné',narozeniny:'Narozeniny',kumi:'🐕 Hlídání Kumi',svatky:'🇨🇿 Státní svátky'};
     const allCalendars=['hanych','eva','spolecne','narozeniny','kumi'];
-    const defaultColors={hanych:'#60a5fa',eva:'#c084fc',spolecne:'#34d399',narozeniny:'#fb923c',kumi:'#6b7280'};
+    const colorKeys=[...allCalendars,'svatky'];
+    const defaultColors={hanych:'#60a5fa',eva:'#c084fc',spolecne:'#34d399',narozeniny:'#fb923c',kumi:'#6b7280',svatky:'#ef4444'};
     const state={
       cursor:new Date(new Date().getFullYear(),new Date().getMonth(),1),
       events:[],
@@ -231,7 +234,8 @@
     const parseIso=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
     const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
     const escapeHtml=(s='')=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
-    const visibleEvents=()=>state.events.filter(e=>state.filters.has(e.calendar));
+    const isHoliday=e=>e.system_kind==='holiday';
+    const visibleEvents=()=>state.events.filter(e=>isHoliday(e)||state.filters.has(e.calendar));
     const daysBetween=(a,b)=>Math.round((parseIso(b)-parseIso(a))/86400000);
     const addDays=(s,n)=>{const d=parseIso(s);d.setDate(d.getDate()+n);return isoLocal(d)};
 
@@ -244,7 +248,7 @@
 
     function applyColors(colors){
       const root=document.documentElement;
-      allCalendars.forEach(key=>{
+      colorKeys.forEach(key=>{
         const value=colors[key]||defaultColors[key];
         root.style.setProperty(`--${key}`,value);
         root.style.setProperty(`--${key}-bg`,tint(value));
@@ -309,7 +313,7 @@
 
     function eventLabel(e){
       const prefix=e.all_day||!e.start_time?'':`${e.start_time} `;
-      const repeat=e.recurrence==='yearly'?' ↻':'';
+      const repeat=!isHoliday(e)&&e.recurrence==='yearly'?' ↻':'';
       return`${prefix}${e.title}${repeat}`;
     }
 
@@ -344,12 +348,17 @@
         const expanded=state.expandedDays.has(dateKey);
         const shownEvents=expanded?dayEvents:dayEvents.slice(0,3);
         shownEvents.forEach(event=>{
+          const holiday=isHoliday(event);
           const btn=document.createElement('button');
           btn.type='button';
-          btn.className=`event ${event.calendar}`;
+          btn.className=`event ${holiday?'svatky':event.calendar}`;
           btn.textContent=eventLabel(event);
-          btn.title=`${calendarNames[event.calendar]} · ${event.title}`;
-          bindEventInteractions(btn,event);
+          btn.title=`${holiday?'Státní svátek':calendarNames[event.calendar]} · ${event.title}`;
+          if(holiday){
+            btn.setAttribute('aria-label',`Státní svátek: ${event.title}`);
+          }else{
+            bindEventInteractions(btn,event);
+          }
           cell.appendChild(btn);
         });
         if(dayEvents.length>3){
@@ -375,6 +384,7 @@
       box.innerHTML='';
       const{first,last}=monthBounds(),firstKey=isoLocal(first),lastKey=isoLocal(last);
       const events=visibleEvents()
+        .filter(e=>!isHoliday(e))
         .filter(e=>e.start_date<=lastKey&&e.end_date>=firstKey)
         .sort((a,b)=>`${a.start_date} ${a.start_time||''} ${a.title}`.localeCompare(`${b.start_date} ${b.start_time||''} ${b.title}`));
 
@@ -637,7 +647,7 @@
     function renderColorSettings(colors=state.colors){
       const box=$('colorSettings');
       box.innerHTML='';
-      allCalendars.forEach(key=>{
+      colorKeys.forEach(key=>{
         const row=document.createElement('div');
         row.className='color-row';
         row.innerHTML=`<span class="color-name">${escapeHtml(calendarNames[key])}</span><span class="color-hex" data-hex="${key}">${escapeHtml(colors[key]||defaultColors[key])}</span><input class="color-picker" type="color" data-color="${key}" value="${escapeHtml(colors[key]||defaultColors[key])}" aria-label="Barva ${escapeHtml(calendarNames[key])}">`;
