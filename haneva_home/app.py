@@ -15,12 +15,15 @@ HOME_HTML_PATH = "/app/home.html"
 CALENDAR_HTML_PATH = "/app/calendar.html"
 SHOPPING_HTML_PATH = "/app/shopping.html"
 ALLOWED_CALENDARS = {"hanych", "eva", "spolecne", "narozeniny", "kumi"}
+COLOR_KEYS = ALLOWED_CALENDARS | {"svatky"}
+HOLIDAY_NOTE = "Automaticky přidaný den pracovního klidu v ČR."
 DEFAULT_COLORS = {
     "hanych": "#60a5fa",
     "eva": "#c084fc",
     "spolecne": "#34d399",
     "narozeniny": "#fb923c",
     "kumi": "#6b7280",
+    "svatky": "#ef4444",
 }
 HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
@@ -118,6 +121,7 @@ def row_to_event(row):
     item["all_day"] = bool(item["all_day"])
     item["source_start_date"] = item["start_date"]
     item["source_end_date"] = item["end_date"]
+    item["system_kind"] = "holiday" if item.get("notes") == HOLIDAY_NOTE else ""
     return item
 
 
@@ -167,7 +171,7 @@ def get_colors():
     for row in rows:
         calendar = row["key"].replace("calendar_color_", "", 1)
         value = row["value"]
-        if calendar in ALLOWED_CALENDARS and HEX_COLOR_RE.fullmatch(value or ""):
+        if calendar in COLOR_KEYS and HEX_COLOR_RE.fullmatch(value or ""):
             colors[calendar] = value.lower()
     return colors
 
@@ -178,7 +182,7 @@ def save_colors(payload):
         raise ValueError("Neplatné nastavení barev.")
 
     updates = {}
-    for calendar in ALLOWED_CALENDARS:
+    for calendar in COLOR_KEYS:
         if calendar not in incoming:
             continue
         value = str(incoming[calendar]).strip()
@@ -205,7 +209,7 @@ def read_page(path):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HanevaHome/0.5.0"
+    server_version = "HanevaHome/0.5.1"
 
     def send_common_headers(self, status=200, content_type="text/html; charset=utf-8", length=None):
         self.send_response(status)
