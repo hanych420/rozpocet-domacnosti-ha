@@ -32,6 +32,29 @@ TEXT_TYPES = (
     "application/x-javascript",
 )
 
+BUDGET_HOME_CSS = """
+<style id="haneva-budget-home-style">
+.haneva-budget-homebar{position:sticky;top:0;z-index:99999;display:flex;align-items:center;padding:10px 14px;background:rgba(255,255,255,.94);border-bottom:1px solid #e8ebf2;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.haneva-budget-home{display:inline-flex;align-items:center;gap:10px;color:#172033!important;text-decoration:none!important;font-size:15px;font-weight:800;line-height:1}
+.haneva-budget-home-mark{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#111827;color:#fff;font-size:15px;font-weight:850;box-shadow:0 7px 18px rgba(17,24,39,.15)}
+.haneva-budget-home:hover{opacity:.82}
+@media(max-width:760px){.haneva-budget-homebar{padding:8px 10px}.haneva-budget-home-mark{width:32px;height:32px;border-radius:10px}.haneva-budget-home{font-size:14px}}
+</style>
+"""
+
+BUDGET_HOME_HTML = """
+<div class="haneva-budget-homebar" id="haneva-budget-homebar"><a class="haneva-budget-home" href="https://haneva.cz/" aria-label="Zpět na hlavní menu Haneva"><span class="haneva-budget-home-mark">H</span><span>Haneva</span></a></div>
+"""
+
+
+def add_budget_home_link(text):
+    lower = text.lower()
+    if "<body" not in lower or "</head>" not in lower or "haneva-budget-homebar" in text:
+        return text
+    text = re.sub(r"</head>", BUDGET_HOME_CSS + "</head>", text, count=1, flags=re.IGNORECASE)
+    text = re.sub(r"(<body\b[^>]*>)", r"\1" + BUDGET_HOME_HTML, text, count=1, flags=re.IGNORECASE)
+    return text
+
 
 def rewrite_budget_text(text):
     text = text.replace("https://rozpocet.haneva.cz/", "/rozpocet/")
@@ -57,7 +80,10 @@ def rewrite_budget_text(text):
         r"\1=/rozpocet/",
         text,
     )
-    return text
+
+    # Inject the Haneva home link only into actual HTML documents, after URL rewriting
+    # so the absolute homepage link remains https://haneva.cz/.
+    return add_budget_home_link(text)
 
 
 def rewrite_location(value):
@@ -75,7 +101,7 @@ def rewrite_location(value):
 
 
 class GatewayHandler(app.Handler):
-    server_version = "HanevaHome/0.4.0"
+    server_version = "HanevaHome/0.4.1"
 
     def _request_host(self):
         return (self.headers.get("Host") or "").split(":", 1)[0].lower()
