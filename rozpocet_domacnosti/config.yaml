@@ -1,0 +1,22 @@
+name: "Rozpočet domácnosti"
+version: "0.6.1"
+slug: "rozpocet_domacnosti"
+description: "Soukromý web pro domácí rozpočet s lokální SQLite databází."
+init: false
+startup: application
+boot: auto
+stage: stable
+arch:
+  - aarch64
+  - armv7
+  - armhf
+  - amd64
+  - i386
+ports:
+  8099/tcp: 8099
+ports_description:
+  8099/tcp: "Webové rozhraní Rozpočtu domácnosti"
+webui: "http://[HOST]:[PORT:8099]/"
+map:
+  - share:rw
+url: "https://github.com/hanych420/rozpocet-domacnosti-ha"
