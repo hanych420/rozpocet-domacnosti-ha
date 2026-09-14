@@ -3,6 +3,7 @@ from urllib.parse import urlparse, parse_qs
 from datetime import date, timedelta
 import json
 import os
+import re
 import sqlite3
 
 HOST = "0.0.0.0"
@@ -11,6 +12,14 @@ DB_PATH = "/data/calendar.db"
 HOME_HTML_PATH = "/app/home.html"
 CALENDAR_HTML_PATH = "/app/calendar.html"
 ALLOWED_CALENDARS = {"hanych", "eva", "spolecne", "narozeniny", "kumi"}
+DEFAULT_COLORS = {
+    "hanych": "#60a5fa",
+    "eva": "#c084fc",
+    "spolecne": "#34d399",
+    "narozeniny": "#fb923c",
+    "kumi": "#6b7280",
+}
+HEX_COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 
 
 def db():
@@ -40,6 +49,13 @@ def init_db():
             )
         ''')
         conn.execute("CREATE INDEX IF NOT EXISTS idx_events_dates ON events(start_date, end_date)")
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS settings (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL,
+                updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
         conn.commit()
 
 
@@ -140,13 +156,52 @@ def events_for_range(start_s, end_s):
     return result
 
 
+def get_colors():
+    colors = dict(DEFAULT_COLORS)
+    with db() as conn:
+        rows = conn.execute("SELECT key, value FROM settings WHERE key LIKE 'calendar_color_%'").fetchall()
+    for row in rows:
+        calendar = row["key"].replace("calendar_color_", "", 1)
+        value = row["value"]
+        if calendar in ALLOWED_CALENDARS and HEX_COLOR_RE.fullmatch(value or ""):
+            colors[calendar] = value.lower()
+    return colors
+
+
+def save_colors(payload):
+    incoming = payload.get("colors", payload)
+    if not isinstance(incoming, dict):
+        raise ValueError("Neplatné nastavení barev.")
+
+    updates = {}
+    for calendar in ALLOWED_CALENDARS:
+        if calendar not in incoming:
+            continue
+        value = str(incoming[calendar]).strip()
+        if not HEX_COLOR_RE.fullmatch(value):
+            raise ValueError(f"Neplatná barva pro {calendar}.")
+        updates[calendar] = value.lower()
+
+    if updates:
+        with db() as conn:
+            for calendar, value in updates.items():
+                conn.execute(
+                    '''INSERT INTO settings(key, value, updated_at)
+                       VALUES(?, ?, CURRENT_TIMESTAMP)
+                       ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP''',
+                    (f"calendar_color_{calendar}", value),
+                )
+            conn.commit()
+    return get_colors()
+
+
 def read_page(path):
     with open(path, "rb") as f:
         return f.read()
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "HanevaHome/0.3.1"
+    server_version = "HanevaHome/0.3.2"
 
     def send_common_headers(self, status=200, content_type="text/html; charset=utf-8", length=None):
         self.send_response(status)
@@ -193,6 +248,9 @@ class Handler(BaseHTTPRequestHandler):
                 self.send_bytes(read_page(CALENDAR_HTML_PATH))
             except OSError:
                 self.send_bytes(b"Calendar page not found\n", 500, "text/plain; charset=utf-8")
+            return
+        if path == "/api/settings/colors":
+            self.send_json({"colors": get_colors(), "defaults": DEFAULT_COLORS})
             return
         if path == "/api/events":
             query = parse_qs(parsed.query)
@@ -242,6 +300,15 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_PUT(self):
         path = urlparse(self.path).path
+
+        if path == "/api/settings/colors":
+            try:
+                colors = save_colors(self.read_json())
+                self.send_json({"colors": colors, "defaults": DEFAULT_COLORS})
+            except (ValueError, json.JSONDecodeError) as exc:
+                self.send_json({"error": str(exc)}, 400)
+            return
+
         if not path.startswith("/api/events/"):
             self.send_json({"error": "Not found"}, 404)
             return
