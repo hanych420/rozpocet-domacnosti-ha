@@ -1,4 +1,5 @@
 import os
+from datetime import date, timedelta
 from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -9,7 +10,7 @@ import agenda_gateway
 import shopping
 import shopping_official
 
-VERSION = "0.9.1"
+VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
@@ -19,6 +20,214 @@ try:
     gateway.BUDGET_PORT = int(os.environ.get("HANEVA_BUDGET_PORT", str(gateway.BUDGET_PORT)))
 except ValueError:
     gateway.BUDGET_PORT = 8099
+
+
+def _single_validity_date(match):
+    if not match:
+        return None
+    try:
+        day = int(match.group("d"))
+        month = int(match.group("m"))
+        year_text = match.group("y")
+        today = date.today()
+        year = int(year_text) if year_text else today.year
+        value = date(year, month, day)
+        if not year_text:
+            if value < today - timedelta(days=180):
+                value = date(year + 1, month, day)
+            elif value > today + timedelta(days=180):
+                value = date(year - 1, month, day)
+        return value.isoformat()
+    except Exception:
+        return None
+
+
+def _parse_kupi_validity(value):
+    """Převede textovou platnost z Kupi na data použitelná i v nákupním seznamu."""
+    text = str(value or "").strip()
+    if not text:
+        return None, None
+
+    try:
+        valid_from, valid_to = shopping_official._date_range_from_text(text)
+    except Exception:
+        valid_from, valid_to = None, None
+    if valid_from or valid_to:
+        return valid_from, valid_to
+
+    try:
+        match = shopping_official.DATE_SINGLE_RE.search(text)
+    except Exception:
+        match = None
+    single = _single_validity_date(match)
+    if not single:
+        return None, None
+
+    normalized = shopping_official._norm(text)
+    if "od " in normalized and "do " not in normalized:
+        return single, None
+    # U Kupi bývá samostatné datum nejčastěji konec platnosti ("do ...").
+    return None, single
+
+
+def _visible_for_filter(valid_from, valid_to, time_filter):
+    today = date.today()
+    try:
+        start = date.fromisoformat(valid_from) if valid_from else None
+    except Exception:
+        start = None
+    try:
+        end = date.fromisoformat(valid_to) if valid_to else None
+    except Exception:
+        end = None
+
+    if time_filter == "next":
+        return bool(start and start > today)
+    if time_filter == "all":
+        return not (end and end < today - timedelta(days=90))
+    return not (start and start > today) and not (end and end < today)
+
+
+def _group_fallback_deals(deals):
+    groups = {}
+    for deal in deals:
+        key = deal.get("group_key") or "ostatni"
+        group = groups.setdefault(key, {
+            "key": key,
+            "label": deal.get("group_label") or "Ostatní",
+            "deals": [],
+            "stores": set(),
+            "prices": [],
+        })
+        group["deals"].append(deal)
+        if deal.get("store") in {"lidl", "albert"}:
+            group["stores"].add(deal["store"])
+        try:
+            price = shopping_official._float_price(deal.get("price"))
+        except Exception:
+            price = None
+        if price is not None:
+            group["prices"].append(price)
+
+    output = []
+    for group in groups.values():
+        group["deals"].sort(key=lambda d: (
+            d.get("valid_from") or "",
+            shopping_official._float_price(d.get("price")) or 10**9,
+            shopping_official._norm(d.get("name")),
+        ))
+        output.append({
+            "key": group["key"],
+            "label": group["label"],
+            "count": len(group["deals"]),
+            "stores": sorted(group["stores"]),
+            "from_price": shopping_official._fmt_price(min(group["prices"])) if group["prices"] else "",
+            "deals": group["deals"],
+        })
+    output.sort(key=lambda g: (shopping_official._norm(g["label"]), g["key"]))
+    return output
+
+
+def _dated_kupi_fallback(store, time_filter, query_text):
+    """Vrátí Kupi zálohu, ale zachová její textovou platnost a převede ji na data."""
+    try:
+        raw = shopping.get_deals(force=False, query=query_text or None)
+    except Exception:
+        return []
+
+    result = []
+    seen = set()
+    for source in raw.get("deals", []):
+        deal_store = source.get("shop")
+        if deal_store not in {"lidl", "albert"}:
+            continue
+        if store in {"lidl", "albert"} and deal_store != store:
+            continue
+
+        name = str(source.get("name") or "").strip()
+        if not name:
+            continue
+        validity_text = str(source.get("validity") or "").strip()
+        valid_from, valid_to = _parse_kupi_validity(validity_text)
+        if not _visible_for_filter(valid_from, valid_to, time_filter):
+            continue
+
+        group_key, group_label = shopping_official._group_for(name)
+        status, _ = shopping_official._timing(valid_from, valid_to)
+        key = (
+            shopping_official._norm(name),
+            deal_store,
+            str(source.get("price") or ""),
+            valid_from or "",
+            valid_to or "",
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+
+        # Na stránce Akce nechceme oranžové/červené urgence. Pokud se platnost
+        # podařila převést na data, samotná stránka ji zobrazí jako běžný rozsah.
+        # Když Kupi pošle neobvyklý text, zachováme ho alespoň jako šedou informaci.
+        status_message = " " if (valid_from or valid_to) else (f"Platnost: {validity_text}" if validity_text else "")
+        result.append({
+            "id": None,
+            "name": name,
+            "shop": deal_store,
+            "store": deal_store,
+            "price": source.get("price") or "",
+            "price_text": source.get("price") or "",
+            "original_price": source.get("original_price") or "",
+            "discount_percent": source.get("discount_percent"),
+            "amount": source.get("amount") or "",
+            "valid_from": valid_from,
+            "valid_to": valid_to,
+            "source_url": source.get("kupi_url") or "",
+            "source_kind": "kupi-fallback",
+            "status": status,
+            "status_message": status_message,
+            "group_key": group_key,
+            "group_label": group_label,
+        })
+    return result
+
+
+def _prepare_deals_payload(store, time_filter, query_text):
+    data = shopping_official.get_grouped_deals(
+        store=store,
+        time_filter=time_filter,
+        query=query_text,
+    )
+
+    groups = data.get("groups") or []
+    returned_deals = [deal for group in groups for deal in (group.get("deals") or [])]
+    has_official = any(deal.get("source_kind") != "kupi-fallback" for deal in returned_deals)
+
+    # Pokud oficiální parser pro daný pohled nic nevydal, použijeme stejnou
+    # Kupi zálohu jako dřív, ale tentokrát nezahodíme údaj o platnosti.
+    if not has_official:
+        fallback = _dated_kupi_fallback(store, time_filter, query_text)
+        if fallback:
+            data["groups"] = _group_fallback_deals(fallback)
+            data["count"] = len(fallback)
+            data["source"] = "kupi-fallback"
+            returned_deals = fallback
+
+    # Urgentní texty typu "končí zítra" patří jen do nákupního seznamu.
+    # Na stránce Akce necháváme pouze normální datum/rozsah platnosti.
+    for group in data.get("groups") or []:
+        for deal in group.get("deals") or []:
+            if deal.get("valid_from") or deal.get("valid_to"):
+                deal["status_message"] = " "
+
+    # HTML 0.9.x očekává jednodušší názvy těchto stavů; doplníme aliasy,
+    # aby bylo vidět, zda kontrola právě běží a zda některý zdroj selhal.
+    sync = dict(data.get("sync") or {})
+    sync["syncing"] = bool(sync.get("running"))
+    sync["last_success_at"] = sync.get("last_finished_at")
+    sync["errors"] = [sync["last_error"]] if sync.get("last_error") else []
+    sync["official_counts"] = dict(sync.get("last_counts") or {})
+    data["sync"] = sync
+    return data
 
 
 class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
@@ -48,7 +257,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             if time_filter not in {"current", "next", "all"}:
                 time_filter = "current"
             text = (query.get("q", [""])[0] or "").strip()[:120]
-            self.send_json(shopping_official.get_grouped_deals(store=store, time_filter=time_filter, query=text))
+            self.send_json(_prepare_deals_payload(store, time_filter, text))
             return
 
         # Legacy Kupi search stays available as a fallback/debug endpoint.
