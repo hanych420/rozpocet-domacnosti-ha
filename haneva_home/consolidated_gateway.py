@@ -9,7 +9,7 @@ import agenda_gateway
 import shopping
 import shopping_official
 
-VERSION = "0.9.0"
+VERSION = "0.9.1"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
