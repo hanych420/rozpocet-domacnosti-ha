@@ -13,6 +13,12 @@ RUN base64 -d /tmp/legacy_budget_patch_v062.py.gz.b64 | gzip -d > /tmp/legacy_bu
     && python3 /tmp/legacy_budget_patch_v062.py \
     && rm -f /tmp/legacy_budget_patch_v062.py /tmp/legacy_budget_patch_v062.py.gz.b64
 
+# v0.7.0 přidává položkovou správu pravidelných nákladů přímo do rozpočtu.
+COPY legacy_budget_patch_v070.py.gz.b64 /tmp/legacy_budget_patch_v070.py.gz.b64
+RUN base64 -d /tmp/legacy_budget_patch_v070.py.gz.b64 | gzip -d > /tmp/legacy_budget_patch_v070.py \
+    && python3 /tmp/legacy_budget_patch_v070.py \
+    && rm -f /tmp/legacy_budget_patch_v070.py /tmp/legacy_budget_patch_v070.py.gz.b64
+
 WORKDIR /tmp
 RUN mkdir -p /tmp/legacy_budget_ready \
     && cp -a /app/. /tmp/legacy_budget_ready/ \
