@@ -37,7 +37,10 @@ COPY agenda_gateway.py /app/agenda_gateway.py
 COPY consolidated_gateway.py /app/consolidated_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
-COPY shopping_official.py /app/shopping_official.py
+# Původní API ponechává schéma, grupování a filtrování. Wrapper v 0.9.3 pouze
+# přepíná synchronizaci na nový worker pro oficiální Lidl/Albert letáky.
+COPY shopping_official.py /app/shopping_official_base.py
+COPY shopping_official_wrapper.py /app/shopping_official.py
 COPY shopping_leaflets.py /app/shopping_leaflets.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
@@ -47,6 +50,7 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
+RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.9.3"/' /app/consolidated_gateway.py
 
 # Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
 # zpřístupníme jeho pomocné soubory i na původním místě. Existující soubory Hanevy
