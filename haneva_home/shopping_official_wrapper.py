@@ -13,10 +13,11 @@ for _name in dir(_base):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_base, _name)
 
-# Load the 0.9.3 implementation first; 0.9.4 builds on its PDF extraction and
-# source bookkeeping but replaces discovery with retailer-specific strategies.
+# Layer the retailer fixes so each version can reuse the previous discovery,
+# PDF extraction and source bookkeeping without duplicating the whole module.
 import shopping_leaflets as _leaflets_v093
-import shopping_leaflets_v094 as _leaflets
+import shopping_leaflets_v094 as _leaflets_v094
+import shopping_leaflets_v095 as _leaflets
 
 start_worker = _leaflets.start_worker
 request_sync = _leaflets.request_sync
