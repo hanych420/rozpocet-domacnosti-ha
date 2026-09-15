@@ -1,7 +1,27 @@
 FROM ghcr.io/home-assistant/base:latest
 
-RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4
+RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 coreutils
 
+# Nejprve sestavíme původní Rozpočet domácnosti přesně stejným způsobem
+# jako v samostatném add-onu a uložíme ho pod /app/budget.
+WORKDIR /app
+COPY legacy_budget_payload/ /tmp/legacy_budget_payload/
+RUN cat /tmp/legacy_budget_payload/chunk* | base64 -d | tar xzf - -C /app \
+    && rm -rf /tmp/legacy_budget_payload
+COPY legacy_budget_patch_v062.py.gz.b64 /tmp/legacy_budget_patch_v062.py.gz.b64
+RUN base64 -d /tmp/legacy_budget_patch_v062.py.gz.b64 | gzip -d > /tmp/legacy_budget_patch_v062.py \
+    && python3 /tmp/legacy_budget_patch_v062.py \
+    && rm -f /tmp/legacy_budget_patch_v062.py /tmp/legacy_budget_patch_v062.py.gz.b64
+
+WORKDIR /tmp
+RUN mkdir -p /tmp/legacy_budget_ready \
+    && cp -a /app/. /tmp/legacy_budget_ready/ \
+    && rm -rf /app \
+    && mkdir -p /app/budget \
+    && cp -a /tmp/legacy_budget_ready/. /app/budget/ \
+    && rm -rf /tmp/legacy_budget_ready
+
+# Haneva Home běží nad tímto embedded rozpočtem.
 WORKDIR /app
 COPY app.py /app/app.py
 COPY gateway.py /app/gateway.py
@@ -16,5 +36,7 @@ COPY shopping.html /app/shopping.html
 COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
+COPY run.sh /app/run.sh
+RUN chmod +x /app/run.sh
 
-CMD ["sh", "-c", "python3 /app/seed_holidays.py && exec python3 /app/agenda_gateway.py"]
+CMD ["/app/run.sh"]
