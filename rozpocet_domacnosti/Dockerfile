@@ -7,4 +7,6 @@ COPY patch_v062.py.gz.b64 /tmp/patch_v062.py.gz.b64
 RUN base64 -d /tmp/patch_v062.py.gz.b64 | gzip -d > /tmp/patch_v062.py \
     && python3 /tmp/patch_v062.py \
     && rm -f /tmp/patch_v062.py /tmp/patch_v062.py.gz.b64
-CMD ["python3", "/app/app.py"]
+COPY run_export.sh /app/run_export.sh
+RUN chmod +x /app/run_export.sh
+CMD ["/app/run_export.sh"]

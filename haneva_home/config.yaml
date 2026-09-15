@@ -1,5 +1,5 @@
 name: "Haneva Home"
-version: "0.5.5"
+version: "0.6.0"
 slug: "haneva_home"
 description: "Domovský rozcestník pro rozpočet, společný kalendář a nákupy."
 init: false
@@ -17,4 +17,7 @@ ports:
 ports_description:
   8100/tcp: "Webové rozhraní Haneva Home"
 webui: "http://[HOST]:[PORT:8100]/"
+map:
+  - type: share
+    read_only: false
 url: "https://github.com/hanych420/rozpocet-domacnosti-ha"
