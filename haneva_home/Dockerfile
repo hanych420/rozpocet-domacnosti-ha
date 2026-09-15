@@ -28,6 +28,7 @@ COPY gateway.py /app/gateway.py
 COPY icon_gateway.py /app/icon_gateway.py
 COPY profile_gateway.py /app/profile_gateway.py
 COPY agenda_gateway.py /app/agenda_gateway.py
+COPY consolidated_gateway.py /app/consolidated_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
 COPY home.html /app/home.html
