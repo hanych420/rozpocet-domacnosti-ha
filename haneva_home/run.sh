@@ -49,4 +49,4 @@ else
   export HANEVA_BUDGET_PORT="8099"
 fi
 
-exec python3 /app/agenda_gateway.py
+exec python3 /app/consolidated_gateway.py
