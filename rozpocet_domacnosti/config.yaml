@@ -1,5 +1,5 @@
 name: "Rozpočet domácnosti"
-version: "0.6.2"
+version: "0.6.3"
 slug: "rozpocet_domacnosti"
 description: "Soukromý web pro domácí rozpočet s lokální SQLite databází."
 init: false
@@ -18,5 +18,6 @@ ports_description:
   8099/tcp: "Webové rozhraní Rozpočtu domácnosti"
 webui: "http://[HOST]:[PORT:8099]/"
 map:
-  - share:rw
+  - type: share
+    read_only: false
 url: "https://github.com/hanych420/rozpocet-domacnosti-ha"
