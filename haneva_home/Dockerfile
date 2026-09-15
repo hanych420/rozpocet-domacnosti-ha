@@ -38,6 +38,16 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN chmod +x /app/run.sh
+
+# Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
+# zpřístupníme jeho pomocné soubory i na původním místě. Existující soubory Hanevy
+# se nikdy nepřepisují; app.py rozpočtu zůstává pod /app/budget/app.py.
+RUN for item in /app/budget/* /app/budget/.[!.]* /app/budget/..?*; do \
+      [ -e "$item" ] || continue; \
+      name="$(basename "$item")"; \
+      [ "$name" = "app.py" ] && continue; \
+      [ -e "/app/$name" ] || ln -s "$item" "/app/$name"; \
+    done \
+    && chmod +x /app/run.sh
 
 CMD ["/app/run.sh"]
