@@ -20,11 +20,12 @@ USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
     "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
 )
+PRICE_RE = re.compile(r"(?<!\d)(\d{1,4}(?:[\s\u00a0]\d{3})*(?:[.,]\d{1,2})?)\s*Kč", re.IGNORECASE)
+PERCENT_RE = re.compile(r"(-?\d+(?:[.,]\d+)?)\s*%")
 
 # Initial profile inferred from the Lidl receipts supplied by the household.
-# The score is only a starting priority for Kupi searches; normal Haneva usage
-# keeps building the real history afterwards. INSERT OR IGNORE makes this seed
-# one-time, so a user can later unwatch an item without it returning on restart.
+# The score is only a starting priority for quick-picks and Kupi searches;
+# normal Haneva usage keeps building the real history afterwards.
 RECEIPT_PROFILE = [
     ("Chléb", 14),
     ("Kuřecí prsa", 13),
@@ -163,9 +164,9 @@ def get_state():
             SELECT display_name, name_norm, times_added, times_completed, watched,
                    last_added_at, last_completed_at
             FROM history
-            WHERE watched=1 OR times_completed>0
-            ORDER BY watched DESC, times_completed DESC, times_added DESC, display_name
-            LIMIT 30
+            WHERE watched=1 OR times_completed>0 OR times_added>0
+            ORDER BY times_completed DESC, times_added DESC, watched DESC, display_name
+            LIMIT 40
         ''').fetchall()]
     for row in history:
         row["watched"] = bool(row["watched"])
@@ -184,12 +185,20 @@ def add_item(payload):
     with db() as conn:
         existing = conn.execute('''
             SELECT * FROM items
-            WHERE checked=0 AND name_norm=? AND preferred_store=?
-            ORDER BY id LIMIT 1
+            WHERE checked=0 AND name_norm=?
+            ORDER BY CASE WHEN preferred_store=? THEN 0 WHEN preferred_store='any' THEN 1 ELSE 2 END,
+                     id
+            LIMIT 1
         ''', (norm, store)).fetchone()
         if existing:
-            if quantity:
-                conn.execute("UPDATE items SET quantity=?, updated_at=CURRENT_TIMESTAMP WHERE id=?", (quantity, existing["id"]))
+            new_store = existing["preferred_store"]
+            if new_store == "any" and store != "any":
+                new_store = store
+            new_quantity = quantity or existing["quantity"]
+            conn.execute(
+                "UPDATE items SET quantity=?, preferred_store=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (new_quantity, new_store, existing["id"]),
+            )
             _upsert_history(conn, name, 1)
             conn.commit()
             row = conn.execute("SELECT * FROM items WHERE id=?", (existing["id"],)).fetchone()
@@ -252,6 +261,8 @@ def delete_item(item_id):
 
 
 def clear_completed():
+    # Completion history lives in the separate history table, so deleting the
+    # visible checked rows does not erase what the household bought.
     with db() as conn:
         cur = conn.execute("DELETE FROM items WHERE checked=1")
         conn.commit()
@@ -327,6 +338,66 @@ def _save_cache(query, payload):
     return now
 
 
+def _price_number(text):
+    match = PRICE_RE.search(_clean(text))
+    if not match:
+        return None
+    raw = match.group(1).replace("\u00a0", "").replace(" ", "").replace(",", ".")
+    try:
+        return float(raw)
+    except ValueError:
+        return None
+
+
+def _format_price(value):
+    if value is None:
+        return ""
+    if abs(value - round(value)) < 0.005:
+        return f"{int(round(value))} Kč"
+    return f"{value:.2f}".replace(".", ",") + " Kč"
+
+
+def _percentage_from_amount(amount):
+    match = PERCENT_RE.search(_clean(amount))
+    if not match:
+        return None
+    try:
+        return int(round(abs(float(match.group(1).replace(",", ".")))))
+    except ValueError:
+        return None
+
+
+def _original_price(discount_row, current_price_text):
+    current = _price_number(current_price_text)
+    if current is None:
+        return None
+
+    selectors = [
+        ".discount_price_old", ".discount_old_price", ".discount_price_before",
+        ".original_price", ".old_price", ".price_before", "del", "s",
+    ]
+    candidates = []
+    for selector in selectors:
+        for element in discount_row.select(selector):
+            value = _price_number(element.get_text(" ", strip=True))
+            if value is not None and value > current + 0.01:
+                candidates.append(value)
+    if candidates:
+        return min(candidates)
+
+    for element in discount_row.find_all(True):
+        classes = " ".join(element.get("class") or []).lower()
+        if "price" not in classes or "value" in classes:
+            continue
+        text = _clean(element.get_text(" ", strip=True))
+        if "/kg" in text.lower() or "/l" in text.lower() or "/ks" in text.lower():
+            continue
+        value = _price_number(text)
+        if value is not None and value > current + 0.01:
+            candidates.append(value)
+    return min(candidates) if candidates else None
+
+
 def _scrape_query(query):
     response = requests.get(
         KUPI_SEARCH_URL,
@@ -361,12 +432,23 @@ def _scrape_query(query):
             validity = _clean(validity_el.get_text(" ", strip=True) if validity_el else "")
             if not price:
                 continue
+
+            original_value = _original_price(discount_row, price)
+            current_value = _price_number(price)
+            discount_percent = None
+            if original_value is not None and current_value is not None and original_value > current_value:
+                discount_percent = int(round((original_value - current_value) / original_value * 100))
+            if discount_percent is None:
+                discount_percent = _percentage_from_amount(amount)
+
             results.append({
                 "query": query,
                 "name": product_name,
                 "shop": shop,
                 "shop_name": "Lidl" if shop == "lidl" else "Albert",
                 "price": price,
+                "original_price": _format_price(original_value),
+                "discount_percent": discount_percent,
                 "amount": amount,
                 "validity": validity,
                 "kupi_url": f"https://www.kupi.cz/hledej?f={quote_plus(query)}&vse=0",
@@ -391,13 +473,14 @@ def _load_query(query, force=False):
         return {"query": query, "deals": [], "fetched_at": None, "cached": False, "error": f"Kupi se nepodařilo načíst: {exc}"}
 
 
-def get_deals(force=False):
-    queries = _candidate_queries()
+def get_deals(force=False, query=None):
+    explicit_query = _clean(query)
+    queries = [explicit_query] if explicit_query else _candidate_queries()
     if not queries:
         return {"deals": [], "queries": [], "updated_at": None, "errors": [], "source": "Kupi.cz"}
     parts = []
     with ThreadPoolExecutor(max_workers=min(4, len(queries))) as pool:
-        futures = {pool.submit(_load_query, query, force): query for query in queries}
+        futures = {pool.submit(_load_query, q, force): q for q in queries}
         for future in as_completed(futures):
             parts.append(future.result())
     deals, seen, errors = [], set(), []
@@ -410,6 +493,8 @@ def get_deals(force=False):
         if part["fetched_at"] and (updated_at is None or part["fetched_at"] > updated_at):
             updated_at = part["fetched_at"]
         for deal in part["deals"]:
+            deal.setdefault("original_price", "")
+            deal.setdefault("discount_percent", _percentage_from_amount(deal.get("amount")))
             key = (normalize_name(deal.get("name")), deal.get("shop"), deal.get("price"), deal.get("amount"))
             if key in seen:
                 continue

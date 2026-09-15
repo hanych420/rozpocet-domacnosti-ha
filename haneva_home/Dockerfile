@@ -40,6 +40,7 @@ COPY shopping.py /app/shopping.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
+COPY shopping_deals.html /app/shopping_deals.html
 COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
