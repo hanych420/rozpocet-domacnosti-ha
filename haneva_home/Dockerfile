@@ -37,6 +37,9 @@ COPY agenda_gateway.py /app/agenda_gateway.py
 COPY consolidated_gateway.py /app/consolidated_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
+COPY shopping_official.py.gz.b64 /tmp/shopping_official.py.gz.b64
+RUN base64 -d /tmp/shopping_official.py.gz.b64 | gzip -d > /app/shopping_official.py \
+    && rm -f /tmp/shopping_official.py.gz.b64
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
