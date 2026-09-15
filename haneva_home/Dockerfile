@@ -6,6 +6,7 @@ WORKDIR /app
 COPY app.py /app/app.py
 COPY gateway.py /app/gateway.py
 COPY icon_gateway.py /app/icon_gateway.py
+COPY profile_gateway.py /app/profile_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
 COPY home.html /app/home.html
@@ -15,4 +16,4 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 
-CMD ["sh", "-c", "python3 /app/seed_holidays.py && exec python3 /app/icon_gateway.py"]
+CMD ["sh", "-c", "python3 /app/seed_holidays.py && exec python3 /app/profile_gateway.py"]
