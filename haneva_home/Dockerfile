@@ -1,6 +1,6 @@
 FROM ghcr.io/home-assistant/base:latest
 
-RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 coreutils
+RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 coreutils poppler-utils
 
 # Nejprve sestavíme původní Rozpočet domácnosti přesně stejným způsobem
 # jako v samostatném add-onu a uložíme ho pod /app/budget.
@@ -38,6 +38,7 @@ COPY consolidated_gateway.py /app/consolidated_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
 COPY shopping_official.py /app/shopping_official.py
+COPY shopping_leaflets.py /app/shopping_leaflets.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
