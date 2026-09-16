@@ -3,6 +3,7 @@
   .condition-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:900;border:1px solid transparent}
   .condition-badge.app{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
   .condition-badge.activation{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+  .package-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:900;background:#f5f3ff;color:#6d28d9;border:1px solid #ddd6fe}
 </style>
 <script>
 (function(){
@@ -57,6 +58,20 @@
               const badge=document.createElement('span');badge.className='condition-badge activation';badge.textContent='⚠ Aktivovat v aplikaci Můj Albert';detailsRow.appendChild(badge);
             }else if(deal.app_required){
               const badge=document.createElement('span');badge.className='condition-badge app';badge.textContent='Můj Albert karta';detailsRow.appendChild(badge);
+            }
+          }
+
+          if(detailsRow&&deal.store==='albert'&&!detailsRow.querySelector('.package-badge')){
+            const labels={bottle:'láhev',can:'plech',pet:'PET',keg:'sud'};
+            const parts=[];
+            if(deal.container&&labels[deal.container])parts.push(labels[deal.container]);
+            const count=Number(deal.pack_count||0);
+            const unit=String(deal.unit_volume||'').replace('.',',');
+            if(count>1&&unit)parts.push(`${count}×${unit}`);
+            else if(count>1)parts.push(`${count} ks`);
+            else if(unit)parts.push(unit);
+            if(parts.length){
+              const badge=document.createElement('span');badge.className='package-badge';badge.textContent=parts.join(' · ');detailsRow.appendChild(badge);
             }
           }
         }
