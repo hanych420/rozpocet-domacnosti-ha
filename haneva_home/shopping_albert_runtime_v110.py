@@ -2,10 +2,11 @@ from __future__ import annotations
 
 """Runtime glue for the user's private/forked Parse.bot Albert API.
 
-Haneva 0.11.1 uses the user's own Parse.bot API copy. The custom
+Haneva 0.11.2 uses the user's own Parse.bot API copy. The custom
 `get_leaflet_products` endpoint already resolves the currently valid general
 Hypermarket + Supermarket leaflets, therefore it must be called exactly once and
-without leaflet/city parameters.
+without leaflet/city parameters. Automatic refreshes are cached for 24 hours;
+a manual check can bypass that cache once.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -19,6 +20,7 @@ import shopping_official_base as core
 
 _DEFAULT_PRODUCTS_ENDPOINT = "get_leaflet_products"
 _ALBERT_REFRESH_HOURS = 24
+_FORCE_META_KEY = "parse_albert_force_once"
 _original_options = source._options
 
 
@@ -78,6 +80,10 @@ def _extract_structured_with_flags(payload, defaults=None, source_url=""):
     products = []
     for obj in source._walk(payload):
         if not isinstance(obj, dict):
+            continue
+
+        explicit_is_food = _first(obj, ("is_food", "isFood"))
+        if explicit_is_food is not None and not _boolish(explicit_is_food):
             continue
 
         name = _first(obj, albert._NAME_KEYS)
@@ -201,7 +207,14 @@ def _sync_with_user_parse_copy():
         return 0
 
     existing = albert._existing_count()
-    if existing and _last_success_fresh():
+    force_once = source._meta_get(_FORCE_META_KEY) == "1"
+    if force_once:
+        # Consume the manual-force marker before the remote call. A failed call
+        # therefore does not cause every automatic worker run to spend credits.
+        source._meta_set(_FORCE_META_KEY, "0")
+        source._log("Albert: ruční kontrola — obcházím 24h cache jedním Parse.bot voláním")
+
+    if existing and _last_success_fresh() and not force_once:
         source._log(f"Albert přes Parse.bot: poslední úspěšná aktualizace je mladší než {_ALBERT_REFRESH_HOURS} h, ponechávám {existing} nabídek")
         return existing
 
