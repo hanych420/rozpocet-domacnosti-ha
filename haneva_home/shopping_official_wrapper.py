@@ -1,7 +1,7 @@
 """Compatibility layer for Haneva shopping offers.
 
 The original shopping_official module still owns SQLite schema, grouping,
-filtering and shopping-list metadata. Version 0.10.0 replaces the retired
+filtering and shopping-list metadata. Version 0.10.x replaces the retired
 HTML/PDF/Kupi acquisition path with external maintained data sources.
 """
 
@@ -13,8 +13,8 @@ for _name in dir(_base):
     if not _name.startswith("__"):
         globals()[_name] = getattr(_base, _name)
 
-import shopping_integrations_v100 as _sources
+import shopping_integrations_v100 as _sources_v100
+import shopping_integrations_v102 as _sources
 
-# The source module patches _base._sync_once and disables the Kupi fallback.
 start_worker = _sources.start_worker
 request_sync = _sources.request_sync
