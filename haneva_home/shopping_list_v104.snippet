@@ -1,0 +1,40 @@
+<style>
+  .qty-stepper{display:inline-flex;align-items:center;gap:2px;border:1px solid #e2e8f0;border-radius:999px;background:#fff;padding:2px;margin-right:2px}
+  .qty-btn{width:24px;height:24px;border:0;border-radius:50%;background:#f1f5f9;color:#334155;font-weight:950;line-height:1;display:grid;place-items:center;padding:0}
+  .qty-btn:disabled{opacity:.3;cursor:default}.qty-value{min-width:27px;text-align:center;font-size:10px;font-weight:900;color:#475569}
+  .sale-link{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;background:#ecfdf5;color:#047857;text-decoration:none;font-size:10px;font-weight:900;border:1px solid #a7f3d0}
+  .sale-link:active{transform:scale(.98)}
+  @media(max-width:650px){.qty-btn{width:25px;height:25px}.sale-link{padding:4px 7px}}
+</style>
+<script>
+(function(){
+  function dealLink(item,deal){
+    const params=new URLSearchParams({time:'current',store:(deal.store||'all'),q:(deal.name||item.name)});
+    if(deal.group_key)params.set('open',deal.group_key);
+    if(deal.name)params.set('focus',deal.name);
+    return `/nakupy/akce?${params.toString()}`;
+  }
+  renderItems=function(){
+    const box=$('items');box.innerHTML='';
+    const open=state.items.filter(i=>!i.checked).length,done=state.items.length-open;
+    $('itemSummary').textContent=`${open} k nákupu${done?` · ${done} hotovo`:''}`;
+    if(!state.items.length){box.innerHTML='<div class="empty">Seznam je prázdný. Přidej první věc, kterou je potřeba koupit.</div>';return}
+    const watched=watchedNorms();
+    state.items.forEach(item=>{
+      const row=document.createElement('div');row.className='item'+(item.checked?' done':'');
+      const store=storeLabel(item.preferred_store);const isWatched=watched.has(norm(item.name));const deal=item.deal||null;
+      const count=Math.max(1,Number(item.count)||1);
+      const alert=deal&&['upcoming','ending','expired'].includes(deal.status)?`<span class="deal-alert ${deal.status}" title="${escapeHtml(deal.message||'')}"><span class="dot ${deal.status}"></span>${escapeHtml(deal.message||'')}</span>`:'';
+      const sale=deal&&!['upcoming','expired'].includes(deal.status)?`<a class="sale-link" href="${escapeHtml(dealLink(item,deal))}" title="${escapeHtml(deal.price?`Akce ${deal.price}`:'Otevřít akci')}">🔥 ve slevě v ${deal.store==='lidl'?'Lidl':deal.store==='albert'?'Albert':'obchodě'}</a>`:'';
+      row.innerHTML=`<input class="check" type="checkbox" ${item.checked?'checked':''} aria-label="Hotovo"><div><div class="item-name">${escapeHtml(item.name)}</div><div class="meta"><span class="qty-stepper"><button class="qty-btn minus" type="button" ${count<=1?'disabled':''} aria-label="Odebrat kus">−</button><span class="qty-value">${count}×</span><button class="qty-btn plus" type="button" aria-label="Přidat kus">+</button></span>${item.quantity?`<span class="pill">${escapeHtml(item.quantity)}</span>`:''}${store?`<span class="pill ${item.preferred_store}">${store}</span>`:''}${sale}${alert}</div></div><button class="icon-btn watch ${isWatched?'active':''}" type="button" title="${isWatched?'Přestat hlídat':'Hlídat akce'}">★</button><button class="icon-btn delete" type="button" title="Smazat">×</button>`;
+      row.querySelector('.check').addEventListener('change',async e=>{try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:e.target.checked})});await loadState()}catch(err){toast(err.message)}});
+      row.querySelector('.plus').addEventListener('click',async()=>{try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:Math.min(999,count+1)})});await loadState()}catch(err){toast(err.message)}});
+      row.querySelector('.minus').addEventListener('click',async()=>{if(count<=1)return;try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:count-1})});await loadState()}catch(err){toast(err.message)}});
+      row.querySelector('.watch').addEventListener('click',async()=>{try{await api('/api/shopping/watch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:item.name,watched:!isWatched})});await loadState()}catch(err){toast(err.message)}});
+      row.querySelector('.delete').addEventListener('click',async()=>{try{await api(`/api/shopping/items/${item.id}`,{method:'DELETE'});await loadState()}catch(err){toast(err.message)}});
+      box.appendChild(row);
+    });
+  };
+  loadState().catch(err=>toast(err.message));
+})();
+</script>
