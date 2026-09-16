@@ -49,7 +49,8 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.0"/' /app/consolidated_gateway.py
+RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.0"/' /app/consolidated_gateway.py \
+    && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert lze připojit přes Parse.bot. Kupi ani vlastní HTML/PDF parser se už nepoužívá.#' /app/shopping_deals.html
 
 # Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
 # zpřístupníme jeho pomocné soubory i na původním místě. Existující soubory Hanevy
