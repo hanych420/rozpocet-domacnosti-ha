@@ -92,17 +92,21 @@ def _extract_structured_with_flags(payload, defaults=None, source_url=""):
         if regular_price_raw in (None, ""):
             regular_price_raw = albert._price_from_structured_text(obj)
         regular_price = core._float_price(regular_price_raw)
+        source_old = core._float_price(_first(obj, albert._OLD_PRICE_KEYS))
         app_price = core._float_price(_first(obj, ("app_price", "appPrice")))
 
         if regular_price is None and app_price is None:
             continue
+
+        standard_price = None
         if app_price is not None and app_price > 0 and (regular_price is None or app_price < regular_price):
             current = app_price
-            old = regular_price
+            old = source_old if source_old is not None and source_old > current else regular_price
+            standard_price = regular_price if regular_price is not None and regular_price > current else None
             explicit_app = True
         else:
             current = regular_price
-            old = core._float_price(_first(obj, albert._OLD_PRICE_KEYS))
+            old = source_old
             explicit_app = _first(obj, ("appRequired", "app_required"))
 
         if current is None or current <= 0:
@@ -126,6 +130,9 @@ def _extract_structured_with_flags(payload, defaults=None, source_url=""):
             condition_text = "Cena platí s kartou Můj Albert"
         else:
             condition_text = explicit_condition
+
+        if standard_price is not None:
+            condition_text = (condition_text + f" · bez aplikace {core._fmt_price(standard_price)}").strip(" ·")
 
         leaflet_type = core._norm(_first(obj, ("leaflet_type", "leafletType")) or "")
         leaflet_label = "Hypermarket" if leaflet_type == "hypermarket" else "Supermarket" if leaflet_type == "supermarket" else ""
