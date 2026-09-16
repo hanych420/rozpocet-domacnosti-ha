@@ -1,11 +1,12 @@
 name: "Haneva Home"
-version: "0.9.8"
+version: "0.10.0"
 slug: "haneva_home"
 description: "Domovský rozcestník pro rozpočet, společný kalendář a nákupy."
 init: false
 startup: application
 boot: auto
 stage: experimental
+homeassistant_api: true
 arch:
   - aarch64
   - armv7
@@ -20,4 +21,7 @@ webui: "http://[HOST]:[PORT:8100]/"
 map:
   - type: share
     read_only: false
+options: {}
+schema:
+  parse_api_key: "password?"
 url: "https://github.com/hanych420/rozpocet-domacnosti-ha"

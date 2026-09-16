@@ -1,6 +1,6 @@
 FROM ghcr.io/home-assistant/base:latest
 
-RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 coreutils poppler-utils
+RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 coreutils
 
 # Nejprve sestavíme původní Rozpočet domácnosti přesně stejným způsobem
 # jako v samostatném add-onu a uložíme ho pod /app/budget.
@@ -37,16 +37,10 @@ COPY agenda_gateway.py /app/agenda_gateway.py
 COPY consolidated_gateway.py /app/consolidated_gateway.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
-# Původní API ponechává schéma, grupování a filtrování. Wrapper přepíná
-# synchronizaci na retailer-specific pracovníky pro Lidl/Albert.
+# Původní shopping_official drží databázi/grupování; data už nečteme z HTML/PDF.
 COPY shopping_official.py /app/shopping_official_base.py
 COPY shopping_official_wrapper.py /app/shopping_official.py
-COPY shopping_leaflets.py /app/shopping_leaflets.py
-COPY shopping_leaflets_v094.py /app/shopping_leaflets_v094.py
-COPY shopping_leaflets_v095.py /app/shopping_leaflets_v095.py
-COPY shopping_leaflets_v096.py /app/shopping_leaflets_v096.py
-COPY shopping_leaflets_v097.py /app/shopping_leaflets_v097.py
-COPY shopping_leaflets_v098.py /app/shopping_leaflets_v098.py
+COPY shopping_integrations_v100.py /app/shopping_integrations_v100.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
@@ -55,7 +49,8 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.9.8"/' /app/consolidated_gateway.py
+RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.0"/' /app/consolidated_gateway.py \
+    && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert lze připojit přes Parse.bot. Kupi ani vlastní HTML/PDF parser se už nepoužívá.#' /app/shopping_deals.html
 
 # Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
 # zpřístupníme jeho pomocné soubory i na původním místě. Existující soubory Hanevy
