@@ -46,6 +46,7 @@ COPY shopping_integrations_v102.py /app/shopping_integrations_v102.py
 COPY shopping_translation_v104.py /app/shopping_translation_v104.py
 COPY shopping_list_v104.py /app/shopping_list_v104.py
 COPY shopping_albert_v110.py /app/shopping_albert_v110.py
+COPY shopping_albert_runtime_v110.py /app/shopping_albert_runtime_v110.py
 COPY shopping_albert_list_meta_v110.py /app/shopping_albert_list_meta_v110.py
 COPY shopping_name_patch_v110.py /tmp/shopping_name_patch_v110.py
 COPY home.html /app/home.html
