@@ -2,11 +2,12 @@ from __future__ import annotations
 
 """Runtime glue for the user's private/forked Parse.bot Albert API.
 
-Haneva 0.11.2 uses the user's own Parse.bot API copy. The custom
-`get_leaflet_products` endpoint already resolves the currently valid general
-Hypermarket + Supermarket leaflets, therefore it must be called exactly once and
-without leaflet/city parameters. Automatic refreshes are cached for 24 hours;
-a manual check can bypass that cache once.
+Haneva 0.11.3 uses the user's own Parse.bot API copy. The custom
+`get_leaflet_products` endpoint resolves the currently valid general Hypermarket
++ Supermarket leaflets and returns structured grocery products. Haneva stores
+Parse.bot semantic classification locally so searches such as "pivo" can match a
+brand-only product name such as "Velkopopovicky Kozel 11" without another API
+call.
 """
 
 from datetime import datetime, timedelta, timezone
@@ -21,7 +22,10 @@ import shopping_official_base as core
 _DEFAULT_PRODUCTS_ENDPOINT = "get_leaflet_products"
 _ALBERT_REFRESH_HOURS = 24
 _FORCE_META_KEY = "parse_albert_force_once"
+_SEMANTIC_VERSION_KEY = "parse_albert_semantic_version"
+_SEMANTIC_VERSION = "1"
 _original_options = source._options
+_original_deal_rows = core._deal_rows
 
 
 def _options_with_defaults():
@@ -73,6 +77,26 @@ def _first(obj, keys):
         if key in obj and obj.get(key) not in (None, ""):
             return obj.get(key)
     return None
+
+
+def _terms(value):
+    if isinstance(value, list):
+        raw = value
+    elif isinstance(value, tuple):
+        raw = list(value)
+    elif isinstance(value, str):
+        raw = [part.strip() for part in value.replace(";", ",").split(",")]
+    else:
+        raw = []
+    out = []
+    seen = set()
+    for item in raw:
+        text = core._clean(item)
+        norm = core._norm(text)
+        if text and norm not in seen:
+            seen.add(norm)
+            out.append(text[:80])
+    return out[:24]
 
 
 def _extract_structured_with_flags(payload, defaults=None, source_url=""):
@@ -163,6 +187,10 @@ def _extract_structured_with_flags(payload, defaults=None, source_url=""):
         amount = core._clean(
             _first(obj, ("package", "packageSize", "package_size") + albert._AMOUNT_KEYS) or ""
         )
+        category = core._clean(_first(obj, ("category", "product_category", "productCategory")) or "")
+        subcategory = core._clean(_first(obj, ("subcategory", "sub_category", "subCategory")) or "")
+        search_terms = _terms(_first(obj, ("search_terms", "searchTerms", "keywords")))
+
         products.append({
             "name": name,
             "price_value": current,
@@ -177,8 +205,114 @@ def _extract_structured_with_flags(payload, defaults=None, source_url=""):
             "app_required": app_required,
             "activation_required": activation_required,
             "condition_text": condition_text,
+            "category": category,
+            "subcategory": subcategory,
+            "search_terms": search_terms,
         })
     return products
+
+
+def _ensure_semantic_schema():
+    with core.db() as conn:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS albert_search_meta (
+                deal_id INTEGER PRIMARY KEY,
+                category TEXT NOT NULL DEFAULT '',
+                subcategory TEXT NOT NULL DEFAULT '',
+                search_terms TEXT NOT NULL DEFAULT '',
+                search_text TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_albert_search_text ON albert_search_meta(search_text)")
+        conn.commit()
+
+
+def _deal_key(name, price, valid_from, valid_to):
+    current = core._float_price(price)
+    return (
+        core._norm(name),
+        round(current, 2) if current is not None else None,
+        core._iso_date(valid_from) or "",
+        core._iso_date(valid_to) or "",
+    )
+
+
+def _store_semantic_meta(deals):
+    _ensure_semantic_schema()
+    by_key = {}
+    for deal in deals:
+        key = _deal_key(deal.get("name"), deal.get("price_value"), deal.get("valid_from"), deal.get("valid_to"))
+        current = by_key.setdefault(key, {"category": "", "subcategory": "", "terms": []})
+        current["category"] = current["category"] or core._clean(deal.get("category"))
+        current["subcategory"] = current["subcategory"] or core._clean(deal.get("subcategory"))
+        for term in deal.get("search_terms") or []:
+            if core._norm(term) not in {core._norm(x) for x in current["terms"]}:
+                current["terms"].append(core._clean(term))
+
+    stored = 0
+    with core.db() as conn:
+        rows = conn.execute(
+            "SELECT id, name, price_value, valid_from, valid_to FROM official_deals WHERE store='albert' AND source_kind='official'"
+        ).fetchall()
+        conn.execute("DELETE FROM albert_search_meta")
+        for row in rows:
+            meta = by_key.get(_deal_key(row["name"], row["price_value"], row["valid_from"], row["valid_to"]))
+            if not meta:
+                continue
+            terms = [t for t in meta["terms"] if t]
+            search_text = core._norm(" ".join([
+                row["name"], meta["category"], meta["subcategory"], *terms
+            ]))
+            conn.execute(
+                "INSERT OR REPLACE INTO albert_search_meta(deal_id, category, subcategory, search_terms, search_text) VALUES(?,?,?,?,?)",
+                (
+                    int(row["id"]),
+                    meta["category"][:80],
+                    meta["subcategory"][:80],
+                    json.dumps(terms, ensure_ascii=False),
+                    search_text,
+                ),
+            )
+            if meta["category"] or meta["subcategory"] or terms:
+                stored += 1
+        conn.commit()
+    return stored
+
+
+def _deal_rows_with_semantics(store="all", query=""):
+    rows = _original_deal_rows(store, query)
+    if not query or store not in {"all", "albert"}:
+        return rows
+
+    _ensure_semantic_schema()
+    q = core._norm(query)
+    if not q:
+        return rows
+    seen = {int(row.get("id")) for row in rows if row.get("id") is not None}
+    with core.db() as conn:
+        semantic = conn.execute(
+            """
+            SELECT d.*
+            FROM official_deals d
+            JOIN albert_search_meta m ON m.deal_id=d.id
+            WHERE d.store='albert' AND m.search_text LIKE ?
+            ORDER BY d.group_label, d.price_value, d.name
+            """,
+            (f"%{q}%",),
+        ).fetchall()
+    for row in semantic:
+        item = dict(row)
+        if int(item["id"]) not in seen:
+            seen.add(int(item["id"]))
+            rows.append(item)
+    rows.sort(key=lambda item: (
+        core._norm(item.get("group_label")),
+        core._float_price(item.get("price_value")) or 10**9,
+        core._norm(item.get("name")),
+    ))
+    return rows
 
 
 def _last_success_fresh():
@@ -208,13 +342,16 @@ def _sync_with_user_parse_copy():
 
     existing = albert._existing_count()
     force_once = source._meta_get(_FORCE_META_KEY) == "1"
+    semantic_upgrade = source._meta_get(_SEMANTIC_VERSION_KEY) != _SEMANTIC_VERSION
     if force_once:
         # Consume the manual-force marker before the remote call. A failed call
         # therefore does not cause every automatic worker run to spend credits.
         source._meta_set(_FORCE_META_KEY, "0")
         source._log("Albert: ruční kontrola — obcházím 24h cache jedním Parse.bot voláním")
+    elif semantic_upgrade:
+        source._log("Albert: aktualizuji data jednou kvůli nové sémantické klasifikaci")
 
-    if existing and _last_success_fresh() and not force_once:
+    if existing and _last_success_fresh() and not force_once and not semantic_upgrade:
         source._log(f"Albert přes Parse.bot: poslední úspěšná aktualizace je mladší než {_ALBERT_REFRESH_HOURS} h, ponechávám {existing} nabídek")
         return existing
 
@@ -224,7 +361,7 @@ def _sync_with_user_parse_copy():
     try:
         # The custom endpoint already returns both current general HM and SM
         # leaflets. It has no input parameters and costs credits per successful
-        # call, so Haneva must call it only once.
+        # call, so Haneva calls it only once per refresh cycle.
         payload = source._parse_get(endpoint, api_key)
         deals = _extract_structured_with_flags(payload, {}, "")
         if not deals:
@@ -237,13 +374,15 @@ def _sync_with_user_parse_copy():
             json.dumps(deals, ensure_ascii=False, sort_keys=True, default=str).encode("utf-8")
         ).hexdigest()
         count = albert._replace_albert(deals, fingerprint)
+        semantic_count = _store_semantic_meta(deals)
         source._meta_set("parse_albert_products_last_success", datetime.now(timezone.utc).isoformat())
         source._meta_set("parse_albert_products_fingerprint", fingerprint)
+        source._meta_set(_SEMANTIC_VERSION_KEY, _SEMANTIC_VERSION)
         activation = sum(1 for d in deals if d.get("activation_required"))
         app_only = sum(1 for d in deals if d.get("app_required") and not d.get("activation_required"))
         source._log(
             f"Albert přes Parse.bot: {count} nabídek z jednoho get_leaflet_products volání; "
-            f"aktivace={activation}, karta/aplikace={app_only}"
+            f"sémantika={semantic_count}, aktivace={activation}, karta/aplikace={app_only}"
         )
         return count
     finally:
@@ -254,3 +393,5 @@ source._options = _options_with_defaults
 albert._extract_structured = _extract_structured_with_flags
 albert._sync_albert_parse_v110 = _sync_with_user_parse_copy
 source._sync_albert_parse = _sync_with_user_parse_copy
+core._deal_rows = _deal_rows_with_semantics
+_ensure_semantic_schema()
