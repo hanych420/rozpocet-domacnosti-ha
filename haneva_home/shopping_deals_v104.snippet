@@ -1,0 +1,46 @@
+<style>
+  .deal.deep-focus{background:#f0fdf4;box-shadow:inset 3px 0 0 #10b981}
+</style>
+<script>
+(function(){
+  const params=new URLSearchParams(window.location.search);
+  const deep={
+    open:params.get('open')||'',
+    focus:params.get('focus')||''
+  };
+  const requestedStore=(params.get('store')||'').toLowerCase();
+  const requestedTime=(params.get('time')||'').toLowerCase();
+  const requestedQuery=(params.get('q')||'').trim();
+  if(['all','lidl','albert'].includes(requestedStore))state.store=requestedStore;
+  if(['current','next','all'].includes(requestedTime))state.time=requestedTime;
+  if(requestedQuery)state.query=requestedQuery;
+
+  if(requestedQuery)$('dealSearch').value=requestedQuery;
+  document.querySelectorAll('.tab.store').forEach(tab=>tab.classList.toggle('active',tab.dataset.store===state.store));
+  document.querySelectorAll('.tab.time').forEach(tab=>tab.classList.toggle('active',tab.dataset.time===state.time));
+
+  const originalRenderGroups=renderGroups;
+  let scrolled=false;
+  renderGroups=function(){
+    originalRenderGroups();
+    if(!deep.open&&!deep.focus)return;
+    const details=[...document.querySelectorAll('#groups details.group')];
+    let target=null;
+    state.groups.forEach((group,index)=>{
+      const el=details[index];if(!el)return;
+      if(deep.open&&group.key===deep.open){el.open=true;target=el}
+      if(deep.focus){
+        const dealIndex=(group.deals||[]).findIndex(d=>norm(d.name||'')===norm(deep.focus));
+        if(dealIndex>=0){
+          el.open=true;target=el;
+          const cards=[...el.querySelectorAll('.deal')];
+          if(cards[dealIndex]){cards[dealIndex].classList.add('deep-focus');target=cards[dealIndex]}
+        }
+      }
+    });
+    if(target&&!scrolled){scrolled=true;setTimeout(()=>target.scrollIntoView({behavior:'smooth',block:'center'}),120)}
+  };
+
+  if(requestedStore||requestedTime||requestedQuery||deep.open||deep.focus)loadDeals().catch(err=>toast(err.message));
+})();
+</script>
