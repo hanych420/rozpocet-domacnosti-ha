@@ -49,6 +49,7 @@ COPY shopping_albert_v110.py /app/shopping_albert_v110.py
 COPY shopping_albert_runtime_v110.py /app/shopping_albert_runtime_v110.py
 COPY shopping_albert_list_meta_v110.py /app/shopping_albert_list_meta_v110.py
 COPY shopping_name_patch_v110.py /tmp/shopping_name_patch_v110.py
+COPY shopping_deals_patch_v113.py /tmp/shopping_deals_patch_v113.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
@@ -61,10 +62,11 @@ COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
 RUN python3 /tmp/gateway_patch_v105.py \
     && python3 /tmp/shopping_name_patch_v110.py \
-    && rm -f /tmp/gateway_patch_v105.py /tmp/shopping_name_patch_v110.py \
-    && sed -i 's/VERSION = "0.9.2"/VERSION = "0.11.2"/' /app/consolidated_gateway.py \
-    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.11.2"/' /app/shopping_integrations_v100.py \
-    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.11.2"/' /app/shopping_integrations_v102.py \
+    && python3 /tmp/shopping_deals_patch_v113.py \
+    && rm -f /tmp/gateway_patch_v105.py /tmp/shopping_name_patch_v110.py /tmp/shopping_deals_patch_v113.py \
+    && sed -i 's/VERSION = "0.9.2"/VERSION = "0.11.3"/' /app/consolidated_gateway.py \
+    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.11.3"/' /app/shopping_integrations_v100.py \
+    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.11.3"/' /app/shopping_integrations_v102.py \
     && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert používá spravované strukturované zdroje Parse.bot; PDF/OCR ani Kupi se už nepoužívají.#' /app/shopping_deals.html \
     && python3 -c 'from pathlib import Path; pairs=[("/app/shopping.html","/app/shopping_list_v104.snippet"),("/app/shopping_deals.html","/app/shopping_deals_v104.snippet")]; [(lambda p,s: p.write_text(p.read_text(encoding="utf-8").replace("</body>",s.read_text(encoding="utf-8")+"\n</body>",1),encoding="utf-8"))(Path(page),Path(snippet)) for page,snippet in pairs]'
 
