@@ -19,6 +19,7 @@ import shopping_translation_v104 as _translation_v104
 import shopping_list_v104 as _list_v104
 import shopping_albert_v110 as _albert_v110
 import shopping_albert_runtime_v110 as _albert_runtime_v110
+import shopping_albert_packaging_v114 as _albert_packaging_v114
 import shopping_albert_list_meta_v110 as _albert_list_meta_v110
 
 start_worker = _sources.start_worker
