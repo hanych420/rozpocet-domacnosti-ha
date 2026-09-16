@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-"""Shopping-list upgrades for Haneva 0.10.4.
+"""Shopping-list upgrades for Haneva 0.10.5.
 
-Adds a numeric item count without breaking the existing free-form quantity
-(e.g. "500 g"), increments duplicate additions, and enriches ordinary/quick
-list items with a confidently matched current official deal.
+Adds a numeric item count without breaking free-form quantity, increments exact
+repeat additions, enriches list items with current deals, and lets a selected
+deal attach to an already existing generic item (e.g. Hrozny -> red grapes)
+instead of creating a duplicate row.
 """
 
 from datetime import date
@@ -13,10 +14,9 @@ import re
 import shopping
 import shopping_official_base as core
 
-VERSION = "0.10.4"
+VERSION = "0.10.5"
 
 _original_init_db = shopping.init_db
-_original_add_item = shopping.add_item
 _original_update_item = shopping.update_item
 _original_item_dict = shopping._item_dict
 _original_enrich_state = core.enrich_state
@@ -103,7 +103,7 @@ def update_item(item_id, payload):
     _ensure_count_schema()
     item = _original_update_item(item_id, payload)
     if "count" not in payload:
-        return item
+        return _item_dict_from_id(item_id) or item
     new_count = _requested_count(payload, item.get("count") or 1)
     with shopping.db() as conn:
         conn.execute(
@@ -113,6 +113,12 @@ def update_item(item_id, payload):
         conn.commit()
         row = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
     return _item_dict(row)
+
+
+def _item_dict_from_id(item_id):
+    with shopping.db() as conn:
+        row = conn.execute("SELECT * FROM items WHERE id=?", (item_id,)).fetchone()
+    return _item_dict(row) if row else None
 
 
 def _tokens(value):
@@ -144,7 +150,6 @@ def _match_score(item_name, deal_name):
         return 0
     matched = sum(1 for token in item_tokens if any(_token_match(token, other) for other in deal_tokens))
     if matched == len(item_tokens):
-        # Handles re-ordered names such as "Salát ledový" vs "Ledový salát".
         return 92 if len(item_tokens) > 1 else 86
     ratio = matched / len(item_tokens)
     return 78 if matched >= 2 and ratio >= 0.66 else 0
@@ -166,6 +171,29 @@ def _current_deals():
     return [dict(row) for row in rows]
 
 
+def _deal_payload(row, score=100, auto_matched=True):
+    status, message = core._timing(row.get("valid_from"), row.get("valid_to"))
+    return {
+        "deal_id": row.get("id"),
+        "name": row.get("name"),
+        "store": row.get("store"),
+        "price": row.get("price_text") or core._fmt_price(row.get("price_value")),
+        "original_price": row.get("original_price") or "",
+        "discount_percent": row.get("discount_percent"),
+        "amount": row.get("amount") or "",
+        "valid_from": row.get("valid_from"),
+        "valid_to": row.get("valid_to"),
+        "source_url": row.get("source_url") or "",
+        "source_kind": row.get("source_kind") or "official",
+        "status": status,
+        "message": message,
+        "group_key": row.get("group_key"),
+        "group_label": row.get("group_label"),
+        "auto_matched": auto_matched,
+        "match_score": score,
+    }
+
+
 def _best_current_deal(item, rows):
     preferred = str(item.get("preferred_store") or "any").lower()
     best = None
@@ -181,42 +209,86 @@ def _best_current_deal(item, rows):
         ):
             best = row
             best_score = score
-    if not best:
-        return None
-    status, message = core._timing(best.get("valid_from"), best.get("valid_to"))
-    return {
-        "deal_id": best.get("id"),
-        "name": best.get("name"),
-        "store": best.get("store"),
-        "price": best.get("price_text") or core._fmt_price(best.get("price_value")),
-        "original_price": best.get("original_price") or "",
-        "discount_percent": best.get("discount_percent"),
-        "amount": best.get("amount") or "",
-        "valid_from": best.get("valid_from"),
-        "valid_to": best.get("valid_to"),
-        "source_url": best.get("source_url") or "",
-        "source_kind": best.get("source_kind") or "official",
-        "status": status,
-        "message": message,
-        "group_key": best.get("group_key"),
-        "group_label": best.get("group_label"),
-        "auto_matched": True,
-        "match_score": best_score,
-    }
+    return _deal_payload(best, best_score, True) if best else None
+
+
+def _attached_deal_ids(item_ids):
+    if not item_ids:
+        return {}
+    placeholders = ",".join("?" for _ in item_ids)
+    with core.db() as conn:
+        rows = conn.execute(
+            f"SELECT item_id, deal_id FROM shopping_item_deals WHERE item_id IN ({placeholders}) AND deal_id IS NOT NULL",
+            item_ids,
+        ).fetchall()
+    return {int(row["item_id"]): int(row["deal_id"]) for row in rows if row["deal_id"] is not None}
 
 
 def enrich_state(state):
     enriched = _original_enrich_state(state)
     rows = _current_deals()
+    by_id = {int(row["id"]): row for row in rows if row.get("id") is not None}
+    item_ids = [int(item["id"]) for item in enriched.get("items", []) if item.get("id") is not None]
+    attached = _attached_deal_ids(item_ids)
+
     for item in enriched.get("items", []):
         if item.get("checked"):
             continue
+        selected_id = attached.get(int(item.get("id") or 0))
+        if selected_id and selected_id in by_id:
+            item["deal"] = _deal_payload(by_id[selected_id], 100, False)
+            continue
         matched = _best_current_deal(item, rows)
         if matched:
-            # Prefer the live catalogue match so quick-pick/manual items get the
-            # current price and a deep-link to the matching offer group.
             item["deal"] = matched
     return enriched
+
+
+def add_or_attach_deal(payload):
+    """Select a deal for an existing similar open item, or add a new row.
+
+    Choosing a deal for generic `Hrozny` should enrich that row, not create a
+    second `Červené stolní hrozny bezsemenné` row. Count is intentionally not
+    incremented when a deal is merely selected for an existing item.
+    """
+    _ensure_count_schema()
+    deal_name = shopping._clean(payload.get("name"))
+    if not deal_name:
+        raise ValueError("Název položky je povinný.")
+    store = shopping._clean(payload.get("preferred_store") or payload.get("store") or "any").lower()
+    if store not in shopping.ALLOWED_STORES:
+        store = "any"
+    amount = shopping._clean(payload.get("quantity") or payload.get("amount") or "")[:80]
+
+    with shopping.db() as conn:
+        rows = conn.execute("SELECT * FROM items WHERE checked=0 ORDER BY id").fetchall()
+        best = None
+        best_score = 0
+        for row in rows:
+            score = _match_score(row["name"], deal_name)
+            if score > best_score:
+                best = row
+                best_score = score
+        if best is not None and best_score >= 86:
+            preferred = best["preferred_store"]
+            if preferred == "any" and store in {"lidl", "albert"}:
+                preferred = store
+            quantity = best["quantity"] or amount
+            conn.execute(
+                "UPDATE items SET preferred_store=?, quantity=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (preferred, quantity, best["id"]),
+            )
+            conn.commit()
+            row = conn.execute("SELECT * FROM items WHERE id=?", (best["id"],)).fetchone()
+            return _item_dict(row), True, best_score
+
+    item = add_item({
+        "name": deal_name,
+        "quantity": amount,
+        "preferred_store": store,
+        "count": 1,
+    })
+    return item, False, 0
 
 
 shopping.init_db = init_db
