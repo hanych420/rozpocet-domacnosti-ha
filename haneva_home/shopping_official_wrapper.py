@@ -19,7 +19,8 @@ import shopping_leaflets as _leaflets_v093
 import shopping_leaflets_v094 as _leaflets_v094
 import shopping_leaflets_v095 as _leaflets_v095
 import shopping_leaflets_v096 as _leaflets_v096
-import shopping_leaflets_v097 as _leaflets
+import shopping_leaflets_v097 as _leaflets_v097
+import shopping_leaflets_v098 as _leaflets
 
 start_worker = _leaflets.start_worker
 request_sync = _leaflets.request_sync

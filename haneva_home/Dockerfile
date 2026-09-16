@@ -46,6 +46,7 @@ COPY shopping_leaflets_v094.py /app/shopping_leaflets_v094.py
 COPY shopping_leaflets_v095.py /app/shopping_leaflets_v095.py
 COPY shopping_leaflets_v096.py /app/shopping_leaflets_v096.py
 COPY shopping_leaflets_v097.py /app/shopping_leaflets_v097.py
+COPY shopping_leaflets_v098.py /app/shopping_leaflets_v098.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
@@ -54,7 +55,7 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.9.7"/' /app/consolidated_gateway.py
+RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.9.8"/' /app/consolidated_gateway.py
 
 # Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
 # zpřístupníme jeho pomocné soubory i na původním místě. Existující soubory Hanevy
