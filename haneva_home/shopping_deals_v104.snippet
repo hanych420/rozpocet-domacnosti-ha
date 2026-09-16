@@ -23,17 +23,31 @@
   let scrolled=false;
   renderGroups=function(){
     originalRenderGroups();
-    if(!deep.open&&!deep.focus)return;
     const details=[...document.querySelectorAll('#groups details.group')];
     let target=null;
+
     state.groups.forEach((group,index)=>{
       const el=details[index];if(!el)return;
+      const cards=[...el.querySelectorAll('.deal')];
+      (group.deals||[]).forEach((deal,dealIndex)=>{
+        const selected=state.items.some(item=>!item.checked&&item.deal&&Number(item.deal.deal_id)===Number(deal.id));
+        if(selected&&cards[dealIndex]){
+          const button=cards[dealIndex].querySelector('.add-deal');
+          if(button){button.textContent='✓ Na seznamu';button.classList.add('added');button.disabled=true}
+        }
+      });
+
       if(deep.open&&group.key===deep.open){el.open=true;target=el}
       if(deep.focus){
-        const dealIndex=(group.deals||[]).findIndex(d=>norm(d.name||'')===norm(deep.focus));
+        let dealIndex=(group.deals||[]).findIndex(d=>norm(d.name||'')===norm(deep.focus));
+        if(dealIndex<0){
+          const wanted=norm(deep.focus).split(' ').filter(Boolean);
+          dealIndex=(group.deals||[]).findIndex(d=>{
+            const name=norm(d.name||'');return wanted.length&&wanted.every(token=>name.includes(token));
+          });
+        }
         if(dealIndex>=0){
           el.open=true;target=el;
-          const cards=[...el.querySelectorAll('.deal')];
           if(cards[dealIndex]){cards[dealIndex].classList.add('deep-focus');target=cards[dealIndex]}
         }
       }

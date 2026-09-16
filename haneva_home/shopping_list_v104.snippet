@@ -9,7 +9,10 @@
 <script>
 (function(){
   function dealLink(item,deal){
-    const params=new URLSearchParams({time:'current',store:(deal.store||'all'),q:(deal.name||item.name)});
+    // Do not filter the deals API by q here. The selected deal already comes
+    // from the same catalogue; loading the store and focusing the exact deal
+    // is more reliable than a second text search (word order can differ).
+    const params=new URLSearchParams({time:'current',store:(deal.store||'all')});
     if(deal.group_key)params.set('open',deal.group_key);
     if(deal.name)params.set('focus',deal.name);
     return `/nakupy/akce?${params.toString()}`;

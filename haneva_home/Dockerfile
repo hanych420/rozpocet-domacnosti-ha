@@ -35,6 +35,7 @@ COPY icon_gateway.py /app/icon_gateway.py
 COPY profile_gateway.py /app/profile_gateway.py
 COPY agenda_gateway.py /app/agenda_gateway.py
 COPY consolidated_gateway.py /app/consolidated_gateway.py
+COPY gateway_patch_v105.py /tmp/gateway_patch_v105.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
 # Původní shopping_official drží databázi/grupování; data už nečteme z HTML/PDF.
@@ -54,9 +55,11 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.4"/' /app/consolidated_gateway.py \
-    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.10.4"/' /app/shopping_integrations_v100.py \
-    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.10.4"/' /app/shopping_integrations_v102.py \
+RUN python3 /tmp/gateway_patch_v105.py \
+    && rm -f /tmp/gateway_patch_v105.py \
+    && sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.5"/' /app/consolidated_gateway.py \
+    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.10.5"/' /app/shopping_integrations_v100.py \
+    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.10.5"/' /app/shopping_integrations_v102.py \
     && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert lze připojit přes Parse.bot. Kupi ani vlastní HTML/PDF parser se už nepoužívá.#' /app/shopping_deals.html \
     && python3 -c 'from pathlib import Path; pairs=[("/app/shopping.html","/app/shopping_list_v104.snippet"),("/app/shopping_deals.html","/app/shopping_deals_v104.snippet")]; [(lambda p,s: p.write_text(p.read_text(encoding="utf-8").replace("</body>",s.read_text(encoding="utf-8")+"\n</body>",1),encoding="utf-8"))(Path(page),Path(snippet)) for page,snippet in pairs]'
 
