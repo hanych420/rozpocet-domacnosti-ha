@@ -15,6 +15,7 @@ for _name in dir(_base):
 
 import shopping_integrations_v100 as _sources_v100
 import shopping_integrations_v102 as _sources
+import shopping_translation_v104 as _translation_v104
 import shopping_list_v104 as _list_v104
 
 start_worker = _sources.start_worker
