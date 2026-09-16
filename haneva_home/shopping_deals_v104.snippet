@@ -30,10 +30,25 @@
       const el=details[index];if(!el)return;
       const cards=[...el.querySelectorAll('.deal')];
       (group.deals||[]).forEach((deal,dealIndex)=>{
-        const selected=state.items.some(item=>!item.checked&&item.deal&&Number(item.deal.deal_id)===Number(deal.id));
-        if(selected&&cards[dealIndex]){
+        // Auto-match on the shopping list is only a suggestion. It must not make
+        // a specific offer look selected before the user actually chooses it.
+        const exactSelected=state.items.some(item=>
+          !item.checked&&item.deal&&item.deal.auto_matched===false&&
+          Number(item.deal.deal_id)===Number(deal.id)
+        );
+        const suggested=state.items.some(item=>
+          !item.checked&&item.deal&&item.deal.auto_matched===true&&
+          Number(item.deal.deal_id)===Number(deal.id)
+        );
+        if(cards[dealIndex]){
           const button=cards[dealIndex].querySelector('.add-deal');
-          if(button){button.textContent='✓ Na seznamu';button.classList.add('added');button.disabled=true}
+          if(exactSelected&&button){
+            button.textContent='✓ Na seznamu';
+            button.classList.add('added');
+            button.disabled=true;
+          }else if(suggested&&button&&!button.disabled){
+            button.textContent='＋ Vybrat tuto akci';
+          }
         }
       });
 
