@@ -22,7 +22,15 @@ import shopping_albert_runtime_v110 as _albert_runtime_v110
 import shopping_albert_list_meta_v110 as _albert_list_meta_v110
 
 start_worker = _sources.start_worker
-request_sync = _sources.request_sync
+
+
+def request_sync(force=False):
+    """Start a sync; a manual/forced sync bypasses Albert's 24h Parse.bot cache once."""
+    if force:
+        _sources_v100._meta_set("parse_albert_force_once", "1")
+    return _sources.request_sync()
+
+
 # shopping_list_v104 patches _base.enrich_state after the re-export above, so
 # expose the patched function explicitly as well.
 enrich_state = _list_v104.enrich_state
