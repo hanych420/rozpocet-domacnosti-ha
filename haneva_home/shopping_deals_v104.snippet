@@ -1,5 +1,8 @@
 <style>
   .deal.deep-focus{background:#f0fdf4;box-shadow:inset 3px 0 0 #10b981}
+  .condition-badge{display:inline-flex;align-items:center;border-radius:999px;padding:3px 7px;font-size:10px;font-weight:900;border:1px solid transparent}
+  .condition-badge.app{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .condition-badge.activation{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
 </style>
 <script>
 (function(){
@@ -30,8 +33,6 @@
       const el=details[index];if(!el)return;
       const cards=[...el.querySelectorAll('.deal')];
       (group.deals||[]).forEach((deal,dealIndex)=>{
-        // Auto-match on the shopping list is only a suggestion. It must not make
-        // a specific offer look selected before the user actually chooses it.
         const exactSelected=state.items.some(item=>
           !item.checked&&item.deal&&item.deal.auto_matched===false&&
           Number(item.deal.deal_id)===Number(deal.id)
@@ -48,6 +49,15 @@
             button.disabled=true;
           }else if(suggested&&button&&!button.disabled){
             button.textContent='＋ Vybrat tuto akci';
+          }
+
+          const detailsRow=cards[dealIndex].querySelector('.details');
+          if(detailsRow&&!detailsRow.querySelector('.condition-badge')){
+            if(deal.activation_required){
+              const badge=document.createElement('span');badge.className='condition-badge activation';badge.textContent='⚠ Aktivovat v aplikaci Můj Albert';detailsRow.appendChild(badge);
+            }else if(deal.app_required){
+              const badge=document.createElement('span');badge.className='condition-badge app';badge.textContent='Můj Albert karta';detailsRow.appendChild(badge);
+            }
           }
         }
       });

@@ -1,5 +1,5 @@
 name: "Haneva Home"
-version: "0.10.6"
+version: "0.11.0"
 slug: "haneva_home"
 description: "Domovský rozcestník pro rozpočet, společný kalendář a nákupy."
 init: false
@@ -21,7 +21,10 @@ webui: "http://[HOST]:[PORT:8100]/"
 map:
   - type: share
     read_only: false
-options: {}
+options:
+  parse_albert_products_endpoint: "get_leaflet_products"
 schema:
   parse_api_key: "password?"
+  parse_api_base: "str?"
+  parse_albert_products_endpoint: "str?"
 url: "https://github.com/hanych420/rozpocet-domacnosti-ha"

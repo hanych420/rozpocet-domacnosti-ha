@@ -1,7 +1,7 @@
 """Compatibility layer for Haneva shopping offers.
 
 The original shopping_official module still owns SQLite schema, grouping,
-filtering and shopping-list metadata. Version 0.10.x replaces the retired
+filtering and shopping-list metadata. Version 0.10+ replaces the retired
 HTML/PDF/Kupi acquisition path with external maintained data sources.
 """
 
@@ -17,6 +17,9 @@ import shopping_integrations_v100 as _sources_v100
 import shopping_integrations_v102 as _sources
 import shopping_translation_v104 as _translation_v104
 import shopping_list_v104 as _list_v104
+import shopping_albert_v110 as _albert_v110
+import shopping_albert_runtime_v110 as _albert_runtime_v110
+import shopping_albert_list_meta_v110 as _albert_list_meta_v110
 
 start_worker = _sources.start_worker
 request_sync = _sources.request_sync

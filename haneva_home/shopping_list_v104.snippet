@@ -4,14 +4,14 @@
   .qty-btn:disabled{opacity:.3;cursor:default}.qty-value{min-width:27px;text-align:center;font-size:10px;font-weight:900;color:#475569}
   .sale-link{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;background:#ecfdf5;color:#047857;text-decoration:none;font-size:10px;font-weight:900;border:1px solid #a7f3d0}
   .sale-link:active{transform:scale(.98)}
-  @media(max-width:650px){.qty-btn{width:25px;height:25px}.sale-link{padding:4px 7px}}
+  .albert-condition{display:inline-flex;align-items:center;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:900;border:1px solid transparent}
+  .albert-condition.app{background:#eff6ff;color:#1d4ed8;border-color:#bfdbfe}
+  .albert-condition.activation{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+  @media(max-width:650px){.qty-btn{width:25px;height:25px}.sale-link,.albert-condition{padding:4px 7px}}
 </style>
 <script>
 (function(){
   function dealLink(item,deal){
-    // Do not filter the deals API by q here. The selected deal already comes
-    // from the same catalogue; loading the store and focusing the exact deal
-    // is more reliable than a second text search (word order can differ).
     const params=new URLSearchParams({time:'current',store:(deal.store||'all')});
     if(deal.group_key)params.set('open',deal.group_key);
     if(deal.name)params.set('focus',deal.name);
@@ -29,7 +29,8 @@
       const count=Math.max(1,Number(item.count)||1);
       const alert=deal&&['upcoming','ending','expired'].includes(deal.status)?`<span class="deal-alert ${deal.status}" title="${escapeHtml(deal.message||'')}"><span class="dot ${deal.status}"></span>${escapeHtml(deal.message||'')}</span>`:'';
       const sale=deal&&!['upcoming','expired'].includes(deal.status)?`<a class="sale-link" href="${escapeHtml(dealLink(item,deal))}" title="${escapeHtml(deal.price?`Akce ${deal.price}`:'Otevřít akci')}">🔥 ve slevě v ${deal.store==='lidl'?'Lidl':deal.store==='albert'?'Albert':'obchodě'}</a>`:'';
-      row.innerHTML=`<input class="check" type="checkbox" ${item.checked?'checked':''} aria-label="Hotovo"><div><div class="item-name">${escapeHtml(item.name)}</div><div class="meta"><span class="qty-stepper"><button class="qty-btn minus" type="button" ${count<=1?'disabled':''} aria-label="Odebrat kus">−</button><span class="qty-value">${count}×</span><button class="qty-btn plus" type="button" aria-label="Přidat kus">+</button></span>${item.quantity?`<span class="pill">${escapeHtml(item.quantity)}</span>`:''}${store?`<span class="pill ${item.preferred_store}">${store}</span>`:''}${sale}${alert}</div></div><button class="icon-btn watch ${isWatched?'active':''}" type="button" title="${isWatched?'Přestat hlídat':'Hlídat akce'}">★</button><button class="icon-btn delete" type="button" title="Smazat">×</button>`;
+      const condition=deal&&deal.store==='albert'&&deal.activation_required?'<span class="albert-condition activation">⚠ Aktivovat v aplikaci Můj Albert</span>':deal&&deal.store==='albert'&&deal.app_required?'<span class="albert-condition app">Můj Albert karta</span>':'';
+      row.innerHTML=`<input class="check" type="checkbox" ${item.checked?'checked':''} aria-label="Hotovo"><div><div class="item-name">${escapeHtml(item.name)}</div><div class="meta"><span class="qty-stepper"><button class="qty-btn minus" type="button" ${count<=1?'disabled':''} aria-label="Odebrat kus">−</button><span class="qty-value">${count}×</span><button class="qty-btn plus" type="button" aria-label="Přidat kus">+</button></span>${item.quantity?`<span class="pill">${escapeHtml(item.quantity)}</span>`:''}${store?`<span class="pill ${item.preferred_store}">${store}</span>`:''}${sale}${condition}${alert}</div></div><button class="icon-btn watch ${isWatched?'active':''}" type="button" title="${isWatched?'Přestat hlídat':'Hlídat akce'}">★</button><button class="icon-btn delete" type="button" title="Smazat">×</button>`;
       row.querySelector('.check').addEventListener('change',async e=>{try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({checked:e.target.checked})});await loadState()}catch(err){toast(err.message)}});
       row.querySelector('.plus').addEventListener('click',async()=>{try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:Math.min(999,count+1)})});await loadState()}catch(err){toast(err.message)}});
       row.querySelector('.minus').addEventListener('click',async()=>{if(count<=1)return;try{await api(`/api/shopping/items/${item.id}`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({count:count-1})});await loadState()}catch(err){toast(err.message)}});
