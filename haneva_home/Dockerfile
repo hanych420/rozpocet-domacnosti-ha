@@ -41,6 +41,7 @@ COPY shopping.py /app/shopping.py
 COPY shopping_official.py /app/shopping_official_base.py
 COPY shopping_official_wrapper.py /app/shopping_official.py
 COPY shopping_integrations_v100.py /app/shopping_integrations_v100.py
+COPY shopping_integrations_v102.py /app/shopping_integrations_v102.py
 COPY home.html /app/home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
@@ -49,8 +50,8 @@ COPY favicon.ico /app/favicon.ico
 COPY apple-touch-icon.png /app/apple-touch-icon.png
 COPY app-icon-v3.png /app/app-icon-v3.png
 COPY run.sh /app/run.sh
-RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.1"/' /app/consolidated_gateway.py \
-    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.10.1"/' /app/shopping_integrations_v100.py \
+RUN sed -i 's/VERSION = "0.9.2"/VERSION = "0.10.2"/' /app/consolidated_gateway.py \
+    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.10.2"/' /app/shopping_integrations_v100.py \
     && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert lze připojit přes Parse.bot. Kupi ani vlastní HTML/PDF parser se už nepoužívá.#' /app/shopping_deals.html
 
 # Pokud starý rozpočet používá absolutní cesty typu /app/index.html nebo /app/static,
