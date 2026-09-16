@@ -24,8 +24,8 @@ import shopping_albert_list_meta_v110 as _albert_list_meta_v110
 start_worker = _sources.start_worker
 
 
-def request_sync(force=False):
-    """Start a sync; a manual/forced sync bypasses Albert's 24h Parse.bot cache once."""
+def request_sync(force=True):
+    """Manual sync bypasses Albert's 24h Parse.bot cache exactly once."""
     if force:
         _sources_v100._meta_set("parse_albert_force_once", "1")
     return _sources.request_sync()
