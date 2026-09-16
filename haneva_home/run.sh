@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/usr/bin/with-contenv sh
 
 MIGRATION_DIR="/share/haneva-budget-migration"
 MIGRATION_ARCHIVE="$MIGRATION_DIR/budget-data.tgz"
