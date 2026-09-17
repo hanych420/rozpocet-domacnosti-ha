@@ -1,5 +1,5 @@
 name: "Haneva Home"
-version: "0.11.5"
+version: "0.11.6"
 slug: "haneva_home"
 description: "Domovský rozcestník pro rozpočet, společný kalendář a nákupy."
 init: false
