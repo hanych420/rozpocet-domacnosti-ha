@@ -159,7 +159,7 @@ def _state_payload(cfg, raw):
         "icon": cfg["icon"],
         "position": int(cfg.get("position") or 0),
         "state": state,
-        "is_on": state == "on",
+        "is_on": (state != "off") if domain == "climate" else state == "on",
         "available": state not in {"unavailable", "unknown", ""},
         "friendly_name": attrs.get("friendly_name") or cfg["name"],
         "brightness_pct": brightness_pct,
