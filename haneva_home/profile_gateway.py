@@ -122,12 +122,15 @@ def init_profile_db():
                 person TEXT NOT NULL DEFAULT '',
                 last_calendar TEXT NOT NULL DEFAULT '',
                 home_layout TEXT NOT NULL DEFAULT '',
+                smart_room_order TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )'''
         )
         columns = {row[1] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()}
         if "home_layout" not in columns:
             conn.execute("ALTER TABLE profiles ADD COLUMN home_layout TEXT NOT NULL DEFAULT ''")
+        if "smart_room_order" not in columns:
+            conn.execute("ALTER TABLE profiles ADD COLUMN smart_room_order TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -165,18 +168,38 @@ def _normalize_home_layout(value):
     return result
 
 
+def _normalize_room_order(value):
+    raw = value
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw else []
+        except Exception:
+            raw = []
+    if not isinstance(raw, (list, tuple)):
+        raw = []
+    result = []
+    for item in raw:
+        room = str(item or "").strip()[:80]
+        if room and room not in result:
+            result.append(room)
+        if len(result) >= 40:
+            break
+    return result
+
+
 def read_profile(email):
     if not email:
-        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES)}
+        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES), "smart_room_order": []}
     with sqlite3.connect(PROFILE_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT person, last_calendar, home_layout FROM profiles WHERE email=?", (email,)).fetchone()
+        row = conn.execute("SELECT person, last_calendar, home_layout, smart_room_order FROM profiles WHERE email=?", (email,)).fetchone()
     if not row:
-        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES)}
+        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES), "smart_room_order": []}
     return {
         "person": row["person"] or "",
         "last_calendar": row["last_calendar"] or "",
         "home_layout": _normalize_home_layout(row["home_layout"]),
+        "smart_room_order": _normalize_room_order(row["smart_room_order"]),
     }
 
 
@@ -221,6 +244,19 @@ def save_home_layout(email, layout):
     return normalized
 
 
+def save_smart_room_order(email, rooms):
+    normalized = _normalize_room_order(rooms)
+    with sqlite3.connect(PROFILE_DB_PATH) as conn:
+        conn.execute(
+            '''INSERT INTO profiles(email, person, last_calendar, home_layout, smart_room_order, updated_at)
+               VALUES(?, '', '', '', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(email) DO UPDATE SET smart_room_order=excluded.smart_room_order, updated_at=CURRENT_TIMESTAMP''',
+            (email, json.dumps(normalized, ensure_ascii=False)),
+        )
+        conn.commit()
+    return normalized
+
+
 def session_payload(email):
     profile = read_profile(email)
     person = profile["person"] if profile["person"] in PERSONS else ""
@@ -238,6 +274,7 @@ def session_payload(email):
         "last_calendar": last_calendar,
         "default_calendar": default_calendar,
         "home_layout": profile.get("home_layout") or list(HOME_TILES),
+        "smart_room_order": profile.get("smart_room_order") or [],
     }
 
 
@@ -345,7 +382,7 @@ class ProfileGatewayHandler(icon_gateway.IconGatewayHandler):
 
     def do_PUT(self):
         path = urlparse(self.path).path
-        if path not in {"/api/session/profile", "/api/session/calendar", "/api/session/home-layout"}:
+        if path not in {"/api/session/profile", "/api/session/calendar", "/api/session/home-layout", "/api/session/home-room-order"}:
             return super().do_PUT()
 
         email = access_email(self)
@@ -359,8 +396,10 @@ class ProfileGatewayHandler(icon_gateway.IconGatewayHandler):
                 save_person(email, str(payload.get("person", "")).strip().lower())
             elif path == "/api/session/calendar":
                 save_last_calendar(email, str(payload.get("calendar", "")).strip().lower())
-            else:
+            elif path == "/api/session/home-layout":
                 save_home_layout(email, payload.get("layout"))
+            else:
+                save_smart_room_order(email, payload.get("rooms"))
             self.send_json(session_payload(email))
         except (ValueError, TypeError) as exc:
             self.send_json({"error": str(exc)}, 400)
