@@ -9,9 +9,11 @@ import profile_gateway
 import agenda_gateway
 import shopping
 import shopping_official
+import home_control
 
 VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
+SMART_HOME_HTML_PATH = "/app/smart_home.html"
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
 # po úspěšné migraci se přepne na embedded server ve stejném kontejneru.
@@ -237,6 +239,20 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
+        if path in ("/domov", "/domov/"):
+            try:
+                self.send_bytes(app.read_page(SMART_HOME_HTML_PATH))
+            except OSError:
+                self.send_bytes(b"Smart home page not found\n", 500, "text/plain; charset=utf-8")
+            return
+
+        if path == "/api/domov":
+            try:
+                self.send_json(home_control.get_overview())
+            except Exception as exc:
+                self.send_json({"error": str(exc)}, 502)
+            return
+
         if path in ("/nakupy/akce", "/nakupy/akce/"):
             try:
                 self.send_bytes(app.read_page(SHOPPING_DEALS_HTML_PATH))
@@ -276,6 +292,20 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
     def do_POST(self):
         path = urlparse(self.path).path
 
+        if path == "/api/domov/entity":
+            try:
+                payload = self.read_json()
+                entity_id = payload.get("entity_id")
+                turn_on = bool(payload.get("turn_on"))
+                self.send_json({"entity": home_control.set_entity(entity_id, turn_on)})
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, 400)
+            except KeyError as exc:
+                self.send_json({"error": str(exc.args[0])}, 404)
+            except Exception as exc:
+                self.send_json({"error": f"Home Assistant nereaguje: {exc}"}, 502)
+            return
+
         if path == "/api/shopping/sync-official":
             self.send_json({"sync": shopping_official.request_sync()}, 202)
             return
@@ -295,6 +325,13 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             return
 
         super().do_POST()
+
+    def do_HEAD(self):
+        path = urlparse(self.path).path
+        if path in ("/domov", "/domov/"):
+            self.send_common_headers(200, "text/html; charset=utf-8", 0)
+            return
+        super().do_HEAD()
 
 
 if __name__ == "__main__":
