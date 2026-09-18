@@ -7,56 +7,197 @@
   <title>Domov · Haneva</title>
   <style>
     :root{color-scheme:light;--bg:#f5f7fb;--surface:rgba(255,255,255,.94);--text:#172033;--muted:#737b89;--line:#e7eaf0;--shadow:0 18px 50px rgba(31,41,55,.09);--blue:#38bdf8}
-    *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 100% 0%,rgba(125,211,252,.23),transparent 29rem),radial-gradient(circle at 0% 0%,rgba(167,139,250,.17),transparent 30rem),var(--bg)}
-    button{font:inherit}.wrap{width:min(960px,calc(100% - 24px));margin:0 auto;padding:22px 0 52px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:30px}.back{display:inline-flex;align-items:center;gap:8px;color:#596174;text-decoration:none;font-size:14px;font-weight:800}.brand{display:flex;align-items:center;gap:10px;font-weight:850}.brand-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#111827;color:#fff}
-    .hero{margin-bottom:24px}.hero h1{margin:0 0 8px;font-size:clamp(38px,9vw,60px);letter-spacing:-.05em;line-height:1}.hero p{margin:0;color:var(--muted);font-size:16px}
-    .rooms{display:flex;flex-direction:column;gap:18px}.room{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:25px;box-shadow:var(--shadow);padding:18px;backdrop-filter:blur(18px)}.room-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.room-name{display:flex;align-items:center;gap:10px;min-width:0}.room-icon{width:40px;height:40px;border-radius:13px;background:#eef8ff;display:grid;place-items:center;font-size:20px}.room h2{margin:0;font-size:22px;letter-spacing:-.03em}.room-sub{margin-top:2px;color:var(--muted);font-size:11px;font-weight:700}
-    .device-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.device{min-width:0;border:1px solid #edf0f4;border-radius:18px;background:#fff;padding:15px;display:flex;flex-direction:column;gap:15px;box-shadow:0 7px 22px rgba(31,41,55,.05);transition:.18s}.device.on{border-color:#bae6fd;background:linear-gradient(145deg,#fff,#f0f9ff);box-shadow:0 10px 26px rgba(56,189,248,.11)}.device.unavailable{opacity:.58}.device-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-icon{width:42px;height:42px;border-radius:13px;background:#f3f4f6;display:grid;place-items:center;font-size:21px}.device.on .device-icon{background:#e0f2fe;box-shadow:0 0 0 5px rgba(56,189,248,.07)}.device-name{font-size:15px;font-weight:850;line-height:1.2;overflow-wrap:anywhere}.device-meta{color:var(--muted);font-size:11px;font-weight:700;margin-top:4px}.device-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}.device-state{font-size:12px;font-weight:800;color:#6b7280}.device.on .device-state{color:#0284c7}.device-state.error{color:#dc2626}
-    .switch{position:relative;width:52px;height:31px;border:0;border-radius:999px;background:#d7dbe2;padding:0;flex:0 0 auto;transition:background .18s;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(17,24,39,.08)}.switch::after{content:"";position:absolute;top:4px;left:4px;width:23px;height:23px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.22);transition:transform .18s}.switch.on{background:#38bdf8}.switch.on::after{transform:translateX(21px)}.switch:disabled{opacity:.45;cursor:not-allowed}.room-switch{width:58px;height:34px}.room-switch::after{width:26px;height:26px}.room-switch.on::after{transform:translateX(24px)}
+    *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+    body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 100% 0%,rgba(125,211,252,.23),transparent 29rem),radial-gradient(circle at 0% 0%,rgba(167,139,250,.17),transparent 30rem),var(--bg)}
+    button,input{font:inherit}.wrap{width:min(960px,calc(100% - 24px));margin:0 auto;padding:22px 0 52px}
+    .top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:30px}.back{display:inline-flex;align-items:center;gap:8px;color:#596174;text-decoration:none;font-size:14px;font-weight:800}.brand{display:flex;align-items:center;gap:10px;font-weight:850}.brand-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#111827;color:#fff}
+    .hero{display:flex;align-items:flex-end;justify-content:space-between;gap:16px;margin-bottom:22px}.hero h1{margin:0 0 8px;font-size:clamp(38px,9vw,60px);letter-spacing:-.05em;line-height:1}.hero p{margin:0;color:var(--muted);font-size:16px}.hero-actions{display:flex;gap:8px;flex:0 0 auto}.soft-btn{border:1px solid rgba(255,255,255,.95);background:rgba(255,255,255,.82);color:#536075;border-radius:13px;padding:10px 12px;font-size:12px;font-weight:850;box-shadow:0 8px 22px rgba(31,41,55,.06)}.soft-btn.active{background:#111827;color:#fff;border-color:#111827}
+    .reorder-note{display:none;margin:-8px 0 14px;color:#7a8391;font-size:12px;font-weight:700}.reorder-note.show{display:block}
+    .rooms{display:flex;flex-direction:column;gap:18px}.room{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:25px;box-shadow:var(--shadow);padding:18px;backdrop-filter:blur(18px);transition:opacity .16s,transform .16s}.room.dragging{opacity:.66;transform:scale(.99);z-index:5}
+    .room-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.room-name{display:flex;align-items:center;gap:10px;min-width:0}.room-icon{width:40px;height:40px;border-radius:13px;background:#eef8ff;display:grid;place-items:center;font-size:20px}.room h2{margin:0;font-size:22px;letter-spacing:-.03em}.room-sub{margin-top:2px;color:var(--muted);font-size:11px;font-weight:700}.room-actions{display:flex;align-items:center;gap:7px}.room-drag{display:none;width:38px;height:38px;border:0;border-radius:12px;background:#111827;color:#fff;font-size:18px;font-weight:900;touch-action:none;user-select:none;-webkit-user-select:none}.rooms.reordering .room-drag{display:grid;place-items:center}.room-power{width:38px;height:38px;border:1px solid #e3e7ec;border-radius:12px;background:#fff;color:#9aa1ad;font-size:18px;font-weight:900;display:grid;place-items:center}.room-power.on{background:#e0f2fe;color:#0284c7;border-color:#bae6fd}.room-power:disabled{opacity:.42}
+    .device-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px}.device{--on-bg:#edfaff;--on-border:#bae6fd;min-width:0;min-height:104px;border:1px solid #edf0f4;border-radius:18px;background:#fff;padding:14px;display:flex;align-items:center;gap:12px;box-shadow:0 7px 22px rgba(31,41,55,.05);transition:background .16s,border-color .16s,transform .1s,opacity .16s;cursor:pointer;position:relative;outline:none}.device:active{transform:scale(.985)}.device:focus-visible{box-shadow:0 0 0 3px rgba(56,189,248,.18)}.device.on{background:var(--on-bg);border-color:var(--on-border);box-shadow:0 10px 26px rgba(56,189,248,.10)}.device.unavailable{opacity:.48;cursor:default}.device.busy{opacity:.62}.device-icon{width:46px;height:46px;border-radius:15px;background:#f3f4f6;display:grid;place-items:center;font-size:23px;flex:0 0 auto}.device.on .device-icon{background:rgba(255,255,255,.78);box-shadow:0 0 0 5px rgba(255,255,255,.28)}.device-name{font-size:15px;font-weight:880;line-height:1.18;overflow-wrap:anywhere;padding-right:34px}.device-control{position:absolute;right:10px;top:10px;width:32px;height:32px;border:0;border-radius:10px;background:rgba(255,255,255,.82);color:#647084;display:grid;place-items:center;font-size:15px;box-shadow:0 4px 13px rgba(31,41,55,.06)}.device-control:active{transform:scale(.95)}
     .statusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:18px;color:#8b93a0;font-size:12px;font-weight:700}.dot{width:7px;height:7px;border-radius:50%;background:#22c55e}.dot.offline{background:#ef4444}.empty{padding:28px;text-align:center;color:var(--muted)}
-    .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:#111827;color:white;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:750;box-shadow:0 12px 34px rgba(17,24,39,.24);opacity:0;pointer-events:none;transition:.2s;z-index:50}.toast.show{opacity:1;transform:translate(-50%,0)}
-    @media(max-width:620px){.wrap{width:calc(100% - 18px);padding-top:14px}.top{margin-bottom:24px}.hero{padding:0 5px}.room{padding:13px;border-radius:22px}.room-head{padding:2px 2px 0}.device-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.device{padding:12px;border-radius:16px;gap:12px}.device-icon{width:38px;height:38px;font-size:19px}.device-name{font-size:13px}.device-meta{font-size:10px}.device-state{font-size:11px}.switch{width:46px;height:29px}.switch::after{width:21px;height:21px}.switch.on::after{transform:translateX(17px)}}
+    .overlay[hidden]{display:none}.overlay{position:fixed;inset:0;z-index:90;background:rgba(15,23,42,.38);backdrop-filter:blur(4px);display:grid;place-items:end center;padding:16px}.sheet{width:min(520px,100%);max-height:min(86dvh,760px);overflow:auto;background:#fff;border-radius:24px;padding:18px;box-shadow:0 28px 90px rgba(15,23,42,.28)}.sheet-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}.sheet-head h2{margin:0;font-size:22px;letter-spacing:-.03em}.close{width:38px;height:38px;border:0;border-radius:12px;background:#f3f4f6;color:#536075;font-size:20px}
+    .control-name{display:flex;align-items:center;gap:12px;margin-bottom:18px}.control-emoji{width:48px;height:48px;border-radius:15px;background:#f3f4f6;display:grid;place-items:center;font-size:24px}.control-name strong{font-size:18px}.control-block{border-top:1px solid var(--line);padding-top:16px;margin-top:16px}.control-label{display:flex;justify-content:space-between;gap:12px;font-size:12px;font-weight:850;color:#596174;margin-bottom:10px}.brightness{width:100%;accent-color:#111827}.presets{display:flex;flex-wrap:wrap;gap:10px}.color-preset,.color-custom{width:42px;height:42px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 1px #d9dde4,0 4px 12px rgba(31,41,55,.10)}.color-custom{overflow:hidden;position:relative;background:conic-gradient(red,#ff0,#0f0,#0ff,#00f,#f0f,red)}.color-custom input{position:absolute;inset:-8px;width:60px;height:60px;opacity:0;cursor:pointer}
+    .settings-note{margin:-5px 0 16px;color:#7b8492;font-size:12px;line-height:1.45}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{font-size:11px;font-weight:850;color:#687386}.field input{width:100%;border:1px solid #dfe3ea;border-radius:12px;background:#fff;padding:11px 12px;min-height:44px;color:#172033}.field input:focus{outline:none;border-color:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,.14)}.primary{border:0;border-radius:12px;background:#111827;color:#fff;padding:11px 14px;font-weight:850}.config-list{display:flex;flex-direction:column;gap:7px;margin-top:14px}.config-row{display:grid;grid-template-columns:38px 1fr auto;align-items:center;gap:9px;border:1px solid #edf0f4;border-radius:13px;padding:9px}.config-icon{width:38px;height:38px;border-radius:11px;background:#f3f4f6;display:grid;place-items:center}.config-title{font-size:13px;font-weight:850}.config-meta{font-size:10px;color:#8a92a0;margin-top:2px;overflow-wrap:anywhere}.remove{border:0;border-radius:10px;background:#fff0f0;color:#dc2626;width:34px;height:34px;font-weight:900}
+    .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:#111827;color:white;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:750;box-shadow:0 12px 34px rgba(17,24,39,.24);opacity:0;pointer-events:none;transition:.2s;z-index:120}.toast.show{opacity:1;transform:translate(-50%,0)}
+    @media(max-width:620px){.wrap{width:calc(100% - 18px);padding-top:14px}.top{margin-bottom:24px}.hero{align-items:flex-start;padding:0 5px}.hero p{font-size:14px}.hero-actions{padding-top:4px}.soft-btn span{display:none}.room{padding:13px;border-radius:22px}.room-head{padding:2px 2px 0}.device-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.device{min-height:94px;padding:11px;gap:9px;border-radius:16px}.device-icon{width:40px;height:40px;font-size:20px}.device-name{font-size:13px;padding-right:27px}.device-control{right:7px;top:7px;width:28px;height:28px}.overlay{padding:8px}.sheet{border-radius:22px 22px 16px 16px;padding:16px}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}}
   </style>
 </head>
 <body>
   <main class="wrap">
     <div class="top"><a class="back" href="/">← Přehled</a><div class="brand"><span>Haneva</span><span class="brand-mark">H</span></div></div>
-    <section class="hero"><h1>Domov</h1><p>Rychlé ovládání zařízení bez otevírání Home Assistantu.</p></section>
+    <section class="hero">
+      <div><h1>Domov</h1><p>Klepnutím na dlaždici zařízení zapneš nebo vypneš.</p></div>
+      <div class="hero-actions"><button class="soft-btn" id="reorderRooms" type="button">↕ <span>Pořadí sekcí</span></button><button class="soft-btn" id="openHomeSettings" type="button">⚙ <span>Nastavení</span></button></div>
+    </section>
+    <div class="reorder-note" id="reorderNote">Chyť sekci za ⋮⋮ a přesuň ji. Pořadí se ukládá zvlášť pro tvůj účet.</div>
     <div class="rooms" id="rooms"><div class="empty">Načítám zařízení…</div></div>
     <div class="statusline"><span class="dot" id="connectionDot"></span><span id="connectionText">Připojuji k Home Assistantu…</span></div>
   </main>
+
+  <div class="overlay" id="controlOverlay" hidden>
+    <section class="sheet">
+      <div class="sheet-head"><h2>Ovládání světla</h2><button class="close" id="closeControls" type="button">×</button></div>
+      <div class="control-name"><div class="control-emoji" id="controlEmoji">💡</div><div><strong id="controlTitle"></strong><div class="config-meta" id="controlRoom"></div></div></div>
+      <div class="control-block" id="brightnessBlock"><div class="control-label"><span>Jas</span><span id="brightnessValue">100 %</span></div><input class="brightness" id="brightnessSlider" type="range" min="1" max="100" value="100"></div>
+      <div class="control-block" id="colorBlock"><div class="control-label"><span>Barva</span><span>předvolby nebo vlastní</span></div><div class="presets" id="colorPresets"></div></div>
+    </section>
+  </div>
+
+  <div class="overlay" id="settingsOverlay" hidden>
+    <section class="sheet">
+      <div class="sheet-head"><h2>Zařízení Domova</h2><button class="close" id="closeHomeSettings" type="button">×</button></div>
+      <p class="settings-note">Zařízení jsou společná pro Hanycha i Evu. Pořadí sekcí má každý uživatel vlastní.</p>
+      <form id="entityForm">
+        <div class="form-grid">
+          <div class="field full"><label for="entityId">ID entity</label><input id="entityId" required placeholder="např. light.lampa"></div>
+          <div class="field"><label for="entityName">Název</label><input id="entityName" placeholder="může zůstat prázdné"></div>
+          <div class="field"><label for="entityIcon">Emoji</label><input id="entityIcon" placeholder="💡" maxlength="12"></div>
+          <div class="field full"><label for="entityRoom">Sekce / místnost</label><input id="entityRoom" required list="roomSuggestions" placeholder="např. Ložnice"><datalist id="roomSuggestions"></datalist></div>
+          <div class="field full"><button class="primary" type="submit">＋ Přidat zařízení</button></div>
+        </div>
+      </form>
+      <div class="config-list" id="configList"></div>
+    </section>
+  </div>
+
   <div class="toast" id="toast"></div>
   <script>
     const roomsEl=document.getElementById('rooms'),dot=document.getElementById('connectionDot'),connectionText=document.getElementById('connectionText');
-    const roomIcons={'Obývací pokoj':'🛋️','Koupelna':'🚿','Ložnice':'🛏️','Chodba':'🚪'};
-    let entities=[],busy=new Set(),toastTimer=null,loading=false;
+    const roomIcons={'Obývací pokoj':'🛋️','Koupelna':'🚿','Ložnice':'🛏️','Chodba':'🚪','Kuchyň':'🍳'};
+    const presets=['#ff8c1a','#ffc49a','#ffe4d4','#ffffff','#73a7ff','#c778ed','#ec84d8','#ff6759','#4fd18b'];
+    let entities=[],busy=new Set(),toastTimer=null,loading=false,reorderMode=false,dragRoom=null,dragHandle=null,session={access_detected:false,smart_room_order:[]},selectedEntityId=null;
+
     function esc(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
     function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2400)}
-    function grouped(){const map=new Map();entities.forEach(e=>{const room=e.room||'Ostatní';if(!map.has(room))map.set(room,[]);map.get(room).push(e)});return [...map.entries()]}
+    function localOrder(){try{return JSON.parse(localStorage.getItem('haneva-room-order')||'[]')}catch(_){return[]}}
+    function currentRooms(){return [...new Set(entities.map(e=>e.room||'Ostatní'))]}
+    function normalizedRoomOrder(order){
+      const existing=currentRooms(),out=[];
+      (Array.isArray(order)?order:[]).forEach(room=>{if(existing.includes(room)&&!out.includes(room))out.push(room)});
+      existing.forEach(room=>{if(!out.includes(room))out.push(room)});
+      return out;
+    }
+    function roomOrder(){return normalizedRoomOrder(session.access_detected?session.smart_room_order:localOrder())}
+    function grouped(){
+      const map=new Map();entities.forEach(e=>{const room=e.room||'Ostatní';if(!map.has(room))map.set(room,[]);map.get(room).push(e)});
+      return roomOrder().map(room=>[room,map.get(room)||[]]).filter(([,items])=>items.length);
+    }
+    function deviceTint(e){
+      if(!e.is_on||!Array.isArray(e.rgb_color))return'';
+      const [r,g,b]=e.rgb_color;
+      return `--on-bg:rgba(${r},${g},${b},.14);--on-border:rgba(${r},${g},${b},.34)`;
+    }
     function render(){
       if(!entities.length){roomsEl.innerHTML='<div class="empty">Žádná zařízení k zobrazení.</div>';return}
+      roomsEl.classList.toggle('reordering',reorderMode);
       roomsEl.innerHTML=grouped().map(([room,items])=>{
         const available=items.filter(x=>x.available),on=available.filter(x=>x.is_on),allOn=available.length>0&&on.length===available.length,roomBusy=items.some(x=>busy.has(x.entity_id));
-        const cards=items.map(e=>`<article class="device ${e.is_on?'on':''} ${e.available?'':'unavailable'}"><div class="device-top"><div class="device-icon">${esc(e.icon||'💡')}</div><div class="device-meta">${esc(e.domain==='fan'?'Větrák':e.domain==='switch'?'Spínač':'Světlo')}</div></div><div><div class="device-name">${esc(e.name||e.friendly_name||e.entity_id)}</div><div class="device-meta">${esc(room)}</div></div><div class="device-foot"><span class="device-state ${e.available?'':'error'}">${e.available?(e.is_on?'Zapnuto':'Vypnuto'):'Nedostupné'}</span><button class="switch ${e.is_on?'on':''}" type="button" data-entity="${esc(e.entity_id)}" aria-label="Přepnout ${esc(e.name||e.entity_id)}" ${!e.available||busy.has(e.entity_id)?'disabled':''}></button></div></article>`).join('');
-        return `<section class="room"><div class="room-head"><div class="room-name"><div class="room-icon">${roomIcons[room]||'🏠'}</div><div><h2>${esc(room)}</h2><div class="room-sub">${on.length} z ${available.length} zapnuto</div></div></div><button class="switch room-switch ${allOn?'on':''}" type="button" data-room="${esc(room)}" aria-label="Přepnout místnost ${esc(room)}" ${!available.length||roomBusy?'disabled':''}></button></div><div class="device-grid">${cards}</div></section>`;
+        const cards=items.map(e=>{
+          const advanced=e.supports_brightness||e.supports_color;
+          return `<article class="device ${e.is_on?'on':''} ${e.available?'':'unavailable'} ${busy.has(e.entity_id)?'busy':''}" role="button" tabindex="${e.available&&!reorderMode?'0':'-1'}" data-device="${esc(e.entity_id)}" style="${deviceTint(e)}" aria-label="${e.is_on?'Vypnout':'Zapnout'} ${esc(e.name)}"><div class="device-icon">${esc(e.icon||'💡')}</div><div class="device-name">${esc(e.name||e.friendly_name||e.entity_id)}</div>${advanced?`<button class="device-control" type="button" data-controls="${esc(e.entity_id)}" aria-label="Jas a barva">⚙</button>`:''}</article>`;
+        }).join('');
+        return `<section class="room" data-room-section="${esc(room)}"><div class="room-head"><div class="room-name"><div class="room-icon">${roomIcons[room]||'🏠'}</div><div><h2>${esc(room)}</h2><div class="room-sub">${on.length} z ${available.length} zapnuto</div></div></div><div class="room-actions"><button class="room-drag" type="button" aria-label="Přesunout sekci">⋮⋮</button><button class="room-power ${allOn?'on':''}" type="button" data-room-power="${esc(room)}" aria-label="Přepnout celou místnost" ${!available.length||roomBusy||reorderMode?'disabled':''}>⏻</button></div></div><div class="device-grid">${cards}</div></section>`;
       }).join('');
-      document.querySelectorAll('[data-entity]').forEach(btn=>btn.addEventListener('click',()=>{const e=entities.find(x=>x.entity_id===btn.dataset.entity);if(e)setPower(e.entity_id,!e.is_on)}));
-      document.querySelectorAll('[data-room]').forEach(btn=>btn.addEventListener('click',()=>{const list=entities.filter(x=>x.room===btn.dataset.room&&x.available);const turnOn=list.some(x=>!x.is_on);setRoom(list,turnOn)}));
+      bindRendered();
+    }
+    function bindRendered(){
+      document.querySelectorAll('[data-device]').forEach(card=>{
+        const toggle=()=>{if(reorderMode)return;const e=entities.find(x=>x.entity_id===card.dataset.device);if(e&&e.available)setPower(e.entity_id,!e.is_on)};
+        card.addEventListener('click',ev=>{if(ev.target.closest('[data-controls]'))return;toggle()});
+        card.addEventListener('keydown',ev=>{if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();toggle()}});
+      });
+      document.querySelectorAll('[data-controls]').forEach(btn=>btn.addEventListener('click',ev=>{ev.preventDefault();ev.stopPropagation();openControls(btn.dataset.controls)}));
+      document.querySelectorAll('[data-room-power]').forEach(btn=>btn.addEventListener('click',()=>{const list=entities.filter(x=>x.room===btn.dataset.roomPower&&x.available);const turnOn=list.some(x=>!x.is_on);setRoom(list,turnOn)}));
+      document.querySelectorAll('.room-drag').forEach(handle=>{
+        handle.addEventListener('pointerdown',ev=>{if(!reorderMode)return;ev.preventDefault();dragRoom=handle.closest('.room');dragHandle=handle;dragRoom.classList.add('dragging');try{handle.setPointerCapture(ev.pointerId)}catch(_){}});
+        handle.addEventListener('pointermove',ev=>{if(!dragRoom||dragHandle!==handle)return;ev.preventDefault();const target=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('.room');if(!target||target===dragRoom||target.parentElement!==roomsEl)return;const list=[...roomsEl.querySelectorAll('.room')],from=list.indexOf(dragRoom),to=list.indexOf(target);if(to<from)roomsEl.insertBefore(dragRoom,target);else roomsEl.insertBefore(dragRoom,target.nextSibling)});
+        const finish=ev=>{if(!dragRoom||dragHandle!==handle)return;ev.preventDefault();dragRoom.classList.remove('dragging');dragRoom=null;dragHandle=null;saveRoomOrder()};
+        handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);
+      });
+    }
+    async function loadSession(){
+      try{const r=await fetch('/api/session',{cache:'no-store'}),data=await r.json();if(r.ok)session={...session,...data}}catch(_){}
+    }
+    async function saveRoomOrder(){
+      const order=[...roomsEl.querySelectorAll('.room')].map(el=>el.dataset.roomSection);
+      session.smart_room_order=order;
+      if(!session.access_detected){try{localStorage.setItem('haneva-room-order',JSON.stringify(order))}catch(_){};return}
+      try{const r=await fetch('/api/session/home-room-order',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({rooms:order})}),data=await r.json();if(r.ok)session={...session,...data}}catch(_){}
     }
     async function load(silent=false){
       if(loading)return;loading=true;
-      try{const r=await fetch('/api/domov',{cache:'no-store'}),data=await r.json();if(!r.ok)throw new Error(data.error||'Stav se nepodařilo načíst.');entities=data.entities||[];const available=entities.filter(x=>x.available).length;dot.classList.toggle('offline',available===0);connectionText.textContent=available?('Home Assistant připojen · '+available+' zařízení dostupných'):'Zařízení nejsou dostupná';}
-      catch(err){dot.classList.add('offline');connectionText.textContent='Home Assistant není dostupný';if(!silent)toast(err.message||'Home Assistant není dostupný.')}
-      finally{loading=false;render()}
+      try{
+        const r=await fetch('/api/domov',{cache:'no-store'}),data=await r.json();if(!r.ok)throw new Error(data.error||'Stav se nepodařilo načíst.');
+        entities=data.entities||[];const available=entities.filter(x=>x.available).length;dot.classList.toggle('offline',available===0);connectionText.textContent=available?('Home Assistant připojen · '+available+' zařízení dostupných'):'Zařízení nejsou dostupná';
+      }catch(err){dot.classList.add('offline');connectionText.textContent='Home Assistant není dostupný';if(!silent)toast(err.message||'Home Assistant není dostupný.')}
+      finally{loading=false;if(!reorderMode)render()}
     }
-    async function setPower(entityId,turnOn){
-      if(busy.has(entityId))return;busy.add(entityId);render();
-      try{const r=await fetch('/api/domov/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:entityId,turn_on:turnOn})}),data=await r.json();if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo ovládat.');const idx=entities.findIndex(x=>x.entity_id===entityId);if(idx>=0)entities[idx]=data.entity;}
-      catch(err){toast(err.message||'Zařízení se nepodařilo ovládat.');await load(true)}
-      finally{busy.delete(entityId);render()}
+    async function sendEntity(entityId,change){
+      if(busy.has(entityId))return null;busy.add(entityId);render();
+      try{
+        const r=await fetch('/api/domov/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:entityId,...change})}),data=await r.json();
+        if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo ovládat.');
+        const idx=entities.findIndex(x=>x.entity_id===entityId);if(idx>=0)entities[idx]=data.entity;return data.entity;
+      }catch(err){toast(err.message||'Zařízení se nepodařilo ovládat.');await load(true);return null}
+      finally{busy.delete(entityId);render();if(selectedEntityId===entityId)refreshControlSheet()}
     }
+    function setPower(entityId,turnOn){return sendEntity(entityId,{turn_on:turnOn})}
     async function setRoom(list,turnOn){for(const e of list)await setPower(e.entity_id,turnOn)}
-    load();setInterval(()=>{if(!busy.size)load(true)},5000);
+
+    function rgbToHex(rgb){if(!Array.isArray(rgb)||rgb.length<3)return'#ffffff';return'#'+rgb.slice(0,3).map(v=>Math.max(0,Math.min(255,Number(v)||0)).toString(16).padStart(2,'0')).join('')}
+    function refreshControlSheet(){
+      const e=entities.find(x=>x.entity_id===selectedEntityId);if(!e)return;
+      document.getElementById('controlEmoji').textContent=e.icon||'💡';document.getElementById('controlTitle').textContent=e.name;document.getElementById('controlRoom').textContent=e.room;
+      document.getElementById('brightnessBlock').style.display=e.supports_brightness?'block':'none';
+      document.getElementById('colorBlock').style.display=e.supports_color?'block':'none';
+      if(e.supports_brightness){const pct=e.brightness_pct||100;document.getElementById('brightnessSlider').value=pct;document.getElementById('brightnessValue').textContent=pct+' %'}
+      if(e.supports_color)renderPresets(e);
+    }
+    function openControls(entityId){selectedEntityId=entityId;refreshControlSheet();document.getElementById('controlOverlay').hidden=false}
+    function closeControls(){document.getElementById('controlOverlay').hidden=true;selectedEntityId=null}
+    function renderPresets(e){
+      const box=document.getElementById('colorPresets');box.innerHTML=presets.map(color=>`<button class="color-preset" type="button" data-color="${color}" style="background:${color}" aria-label="Nastavit barvu ${color}"></button>`).join('')+`<label class="color-custom" aria-label="Vlastní barva"><input id="customColor" type="color" value="${rgbToHex(e.rgb_color)}"></label>`;
+      box.querySelectorAll('[data-color]').forEach(btn=>btn.addEventListener('click',()=>selectedEntityId&&sendEntity(selectedEntityId,{rgb_color:btn.dataset.color})));
+      document.getElementById('customColor').addEventListener('change',ev=>selectedEntityId&&sendEntity(selectedEntityId,{rgb_color:ev.target.value}));
+    }
+    document.getElementById('brightnessSlider').addEventListener('input',ev=>document.getElementById('brightnessValue').textContent=ev.target.value+' %');
+    document.getElementById('brightnessSlider').addEventListener('change',ev=>selectedEntityId&&sendEntity(selectedEntityId,{brightness_pct:Number(ev.target.value)}));
+    document.getElementById('closeControls').addEventListener('click',closeControls);
+    document.getElementById('controlOverlay').addEventListener('click',ev=>{if(ev.target.id==='controlOverlay')closeControls()});
+
+    async function loadConfig(){
+      try{
+        const r=await fetch('/api/domov/config',{cache:'no-store'}),data=await r.json();if(!r.ok)throw new Error(data.error||'Nastavení se nepodařilo načíst.');
+        const rows=data.entities||[],rooms=[...new Set(rows.map(x=>x.room).filter(Boolean))];
+        document.getElementById('roomSuggestions').innerHTML=rooms.map(room=>`<option value="${esc(room)}"></option>`).join('');
+        document.getElementById('configList').innerHTML=rows.map(e=>`<div class="config-row"><div class="config-icon">${esc(e.icon||'💡')}</div><div><div class="config-title">${esc(e.name)}</div><div class="config-meta">${esc(e.room)} · ${esc(e.entity_id)}</div></div><button class="remove" type="button" data-remove="${esc(e.entity_id)}" aria-label="Odebrat">×</button></div>`).join('');
+        document.querySelectorAll('[data-remove]').forEach(btn=>btn.addEventListener('click',()=>removeEntity(btn.dataset.remove)));
+      }catch(err){toast(err.message||'Nastavení se nepodařilo načíst.')}
+    }
+    function openSettings(){document.getElementById('settingsOverlay').hidden=false;loadConfig()}
+    function closeSettings(){document.getElementById('settingsOverlay').hidden=true}
+    document.getElementById('openHomeSettings').addEventListener('click',openSettings);document.getElementById('closeHomeSettings').addEventListener('click',closeSettings);document.getElementById('settingsOverlay').addEventListener('click',ev=>{if(ev.target.id==='settingsOverlay')closeSettings()});
+    document.getElementById('entityForm').addEventListener('submit',async ev=>{
+      ev.preventDefault();
+      const payload={entity_id:document.getElementById('entityId').value.trim(),name:document.getElementById('entityName').value.trim(),icon:document.getElementById('entityIcon').value.trim(),room:document.getElementById('entityRoom').value.trim()};
+      try{
+        const r=await fetch('/api/domov/config/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}),data=await r.json();if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo přidat.');
+        ev.target.reset();toast('Zařízení přidáno.');await Promise.all([load(true),loadConfig()]);
+      }catch(err){toast(err.message||'Zařízení se nepodařilo přidat.')}
+    });
+    async function removeEntity(entityId){
+      if(!confirm('Odebrat toto zařízení z Hanevy? V Home Assistantu zůstane beze změny.'))return;
+      try{const r=await fetch('/api/domov/config/entity/remove',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:entityId})}),data=await r.json();if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo odebrat.');toast('Zařízení odebráno.');await Promise.all([load(true),loadConfig()])}catch(err){toast(err.message||'Zařízení se nepodařilo odebrat.')}
+    }
+
+    document.getElementById('reorderRooms').addEventListener('click',()=>{
+      reorderMode=!reorderMode;document.getElementById('reorderRooms').classList.toggle('active',reorderMode);document.getElementById('reorderRooms').innerHTML=reorderMode?'✓ <span>Hotovo</span>':'↕ <span>Pořadí sekcí</span>';document.getElementById('reorderNote').classList.toggle('show',reorderMode);render();
+    });
+
+    async function bootstrap(){await loadSession();await load();setInterval(()=>{if(!busy.size&&!reorderMode&&!selectedEntityId)load(true)},5000)}
+    bootstrap();
   </script>
 </body>
 </html>
