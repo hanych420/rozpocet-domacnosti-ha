@@ -3,7 +3,7 @@ from __future__ import annotations
 """Home Assistant control bridge for Haneva Home.
 
 The browser never receives the Supervisor token. Configured entities are stored
-locally in /data and only light/switch/fan domains can be added.
+locally in /data and light/switch/fan/climate domains can be added.
 """
 
 import json
@@ -16,7 +16,7 @@ import requests
 HA_API_BASE = "http://supervisor/core/api"
 TIMEOUT = 8
 DB_PATH = "/data/haneva_home_control.db"
-ALLOWED_DOMAINS = {"light", "switch", "fan"}
+ALLOWED_DOMAINS = {"light", "switch", "fan", "climate"}
 ENTITY_RE = re.compile(r"^(light|switch|fan)\.[a-z0-9_]+$")
 
 DEFAULT_ENTITIES = [
@@ -29,6 +29,7 @@ DEFAULT_ENTITIES = [
     ("light.svetlo", "Ložnice", "Ložnice", "🛏️"),
     ("light.extended_color_light_7", "LED skříň", "Ložnice", "🌈"),
     ("light.extended_color_light_1", "Pracovna", "Ložnice", "🖥️"),
+    ("climate.ac_96579049", "Klimoška", "Ložnice", "❄️"),
 ]
 
 
@@ -70,6 +71,19 @@ def init_db():
                 )
             conn.execute(
                 "INSERT OR REPLACE INTO meta(key,value) VALUES('defaults_seeded_v1','1')"
+            )
+        climate_seeded = conn.execute(
+            "SELECT value FROM meta WHERE key='climate_seeded_v2'"
+        ).fetchone()
+        if not climate_seeded:
+            row = conn.execute("SELECT COALESCE(MAX(position),-1)+1 AS p FROM entities").fetchone()
+            conn.execute(
+                """INSERT OR IGNORE INTO entities(entity_id,name,room,icon,position)
+                   VALUES(?,?,?,?,?)""",
+                ("climate.ac_96579049", "Klimoška", "Ložnice", "❄️", int(row["p"] if row else 0)),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO meta(key,value) VALUES('climate_seeded_v2','1')"
             )
         conn.commit()
 
@@ -154,6 +168,13 @@ def _state_payload(cfg, raw):
         "supported_color_modes": modes,
         "rgb_color": rgb,
         "color_temp_kelvin": attrs.get("color_temp_kelvin"),
+        "hvac_modes": [str(x) for x in (attrs.get("hvac_modes") or [])] if domain == "climate" else [],
+        "hvac_mode": state if domain == "climate" else None,
+        "temperature": attrs.get("temperature") if domain == "climate" else None,
+        "current_temperature": attrs.get("current_temperature") if domain == "climate" else None,
+        "min_temp": attrs.get("min_temp") if domain == "climate" else None,
+        "max_temp": attrs.get("max_temp") if domain == "climate" else None,
+        "target_temp_step": attrs.get("target_temp_step") if domain == "climate" else None,
         "last_changed": raw.get("last_changed"),
         "last_updated": raw.get("last_updated"),
     }
@@ -198,6 +219,13 @@ def get_overview():
                 "supported_color_modes": [],
                 "rgb_color": None,
                 "brightness_pct": None,
+                "hvac_modes": [],
+                "hvac_mode": None,
+                "temperature": None,
+                "current_temperature": None,
+                "min_temp": None,
+                "max_temp": None,
+                "target_temp_step": None,
                 "error": str(exc),
             })
     return {"entities": items}
@@ -207,14 +235,14 @@ def add_entity(payload):
     init_db()
     entity_id = str(payload.get("entity_id") or "").strip().lower()
     if not ENTITY_RE.fullmatch(entity_id):
-        raise ValueError("Použij ID entity typu light.xxx, switch.xxx nebo fan.xxx.")
+        raise ValueError("Použij ID entity typu light.xxx, switch.xxx, fan.xxx nebo climate.xxx.")
 
     raw = _raw_state(entity_id)
     attrs = raw.get("attributes") or {}
     domain = entity_id.split(".", 1)[0]
     name = str(payload.get("name") or attrs.get("friendly_name") or entity_id).strip()[:80]
     room = str(payload.get("room") or "Ostatní").strip()[:80] or "Ostatní"
-    default_icon = "🌀" if domain == "fan" else "💡" if domain == "light" else "🔘"
+    default_icon = "❄️" if domain == "climate" else "🌀" if domain == "fan" else "💡" if domain == "light" else "🔘"
     icon = str(payload.get("icon") or default_icon).strip()[:12] or default_icon
 
     with _db() as conn:
@@ -251,7 +279,7 @@ def remove_entity(entity_id):
     return True
 
 
-def set_entity(entity_id, turn_on=None, brightness_pct=None, rgb_color=None):
+def set_entity(entity_id, turn_on=None, brightness_pct=None, rgb_color=None, hvac_mode=None, temperature=None):
     cfg = _config(entity_id)
     entity_id = cfg["entity_id"]
     domain = entity_id.split(".", 1)[0]
@@ -260,6 +288,58 @@ def set_entity(entity_id, turn_on=None, brightness_pct=None, rgb_color=None):
 
     service_data = {"entity_id": entity_id}
     has_adjustment = False
+
+    if domain == "climate":
+        raw = _raw_state(entity_id)
+        attrs = raw.get("attributes") or {}
+        modes = [str(x) for x in (attrs.get("hvac_modes") or [])]
+        if temperature is not None:
+            try:
+                value = float(temperature)
+            except Exception:
+                raise ValueError("Neplatná teplota.")
+            minimum = float(attrs.get("min_temp") or 16)
+            maximum = float(attrs.get("max_temp") or 30)
+            value = max(minimum, min(maximum, value))
+            response = requests.post(
+                f"{HA_API_BASE}/services/climate/set_temperature",
+                headers=_headers(),
+                json={"entity_id": entity_id, "temperature": value},
+                timeout=TIMEOUT,
+            )
+            response.raise_for_status()
+            return get_entity(entity_id)
+
+        if hvac_mode is not None:
+            mode = str(hvac_mode).strip()
+            if mode not in modes:
+                raise ValueError("Tento režim klimatizace není dostupný.")
+        elif turn_on is not None:
+            if bool(turn_on):
+                current = str(raw.get("state") or "off")
+                if current != "off":
+                    return get_entity(entity_id)
+                preferred = ["auto", "cool", "heat", "dry", "fan_only", "heat_cool"]
+                mode = next((item for item in preferred if item in modes), None)
+                if not mode:
+                    mode = next((item for item in modes if item != "off"), None)
+                if not mode:
+                    raise ValueError("Klimatizace nemá dostupný režim pro zapnutí.")
+            else:
+                mode = "off"
+                if mode not in modes:
+                    raise ValueError("Klimatizace nepodporuje vypnutí přes režim off.")
+        else:
+            raise ValueError("Chybí požadovaná změna klimatizace.")
+
+        response = requests.post(
+            f"{HA_API_BASE}/services/climate/set_hvac_mode",
+            headers=_headers(),
+            json={"entity_id": entity_id, "hvac_mode": mode},
+            timeout=TIMEOUT,
+        )
+        response.raise_for_status()
+        return get_entity(entity_id)
 
     if brightness_pct is not None:
         if domain != "light":
