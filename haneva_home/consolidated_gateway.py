@@ -306,12 +306,16 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 turn_on = payload.get("turn_on") if "turn_on" in payload else None
                 brightness_pct = payload.get("brightness_pct")
                 rgb_color = payload.get("rgb_color")
+                hvac_mode = payload.get("hvac_mode")
+                temperature = payload.get("temperature")
                 self.send_json({
                     "entity": home_control.set_entity(
                         entity_id,
                         turn_on=turn_on,
                         brightness_pct=brightness_pct,
                         rgb_color=rgb_color,
+                        hvac_mode=hvac_mode,
+                        temperature=temperature,
                     )
                 })
             except ValueError as exc:
