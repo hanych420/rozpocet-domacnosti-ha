@@ -25,11 +25,11 @@
     .icon{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:var(--surface-solid);box-shadow:0 12px 30px rgba(31,41,55,.10);font-size:28px;position:relative;z-index:1}.card-content{position:relative;z-index:1}.card h2{font-size:30px;line-height:1.08;letter-spacing:-.035em;margin:28px 0 8px}.card p{margin:0;color:var(--muted);line-height:1.5;max-width:410px}
     .bottom{position:relative;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:28px}.status{display:inline-flex;align-items:center;gap:8px;color:#556070;font-size:13px;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:#34d399;box-shadow:0 0 0 5px rgba(52,211,153,.12)}.go{width:42px;height:42px;border-radius:14px;display:grid;place-items:center;background:#111827;color:#fff;font-size:20px;font-weight:800}
     .move-handle{position:absolute;right:14px;top:14px;z-index:6;width:42px;height:42px;border-radius:13px;background:rgba(17,24,39,.92);color:#fff;display:none;place-items:center;font-size:20px;font-weight:900;letter-spacing:-.18em;padding-right:.18em;box-shadow:0 10px 26px rgba(17,24,39,.20);touch-action:none;user-select:none;-webkit-user-select:none;cursor:grab}
-    .grid.editing .move-handle{display:grid}.grid.editing .card{cursor:default}.grid.editing a.card:hover{transform:none}.card.dragging{opacity:.66;transform:scale(.98)!important;box-shadow:0 28px 70px rgba(31,41,55,.20);z-index:8}.reordering{user-select:none;-webkit-user-select:none}
+    .grid.editing .move-handle{display:grid}.grid.editing .card{cursor:default}.grid.editing a.card:hover{transform:none}.card.drag-ghost{position:fixed!important;z-index:160!important;pointer-events:none!important;opacity:.76!important;transform:scale(.985)!important;box-shadow:0 30px 80px rgba(31,41,55,.24)!important;margin:0!important}.card-placeholder{min-height:280px;border:2px dashed #94a3b8;border-radius:var(--radius);background:rgba(255,255,255,.40);pointer-events:none}.reordering{user-select:none;-webkit-user-select:none}
     .edit-note{display:none;margin:-6px 0 16px;color:#70798a;font-size:12px;font-weight:700}.edit-note.show{display:block}
     footer{color:#9aa1ad;text-align:center;font-size:12px;margin-top:30px}
     @media(max-width:980px){.grid{grid-template-columns:1fr 1fr}}
-    @media(max-width:720px){.wrap{width:min(100% - 22px,1120px);padding-top:18px}header{margin-bottom:42px}.today{font-size:12px}.brand{font-size:17px}.brand-mark{width:38px;height:38px;border-radius:12px}.hero{margin-bottom:24px}h1{font-size:clamp(42px,13vw,60px)}.lead{font-size:17px}.layout-bar{margin-bottom:14px}.grid{grid-template-columns:1fr;gap:14px}.card{min-height:235px;padding:22px;border-radius:23px}.card h2{font-size:28px}.move-handle{right:12px;top:12px}}
+    @media(max-width:720px){.wrap{width:min(100% - 22px,1120px);padding-top:18px}header{margin-bottom:42px}.today{font-size:12px}.brand{font-size:17px}.brand-mark{width:38px;height:38px;border-radius:12px}.hero{margin-bottom:24px}h1{font-size:clamp(42px,13vw,60px)}.lead{font-size:17px}.layout-bar{margin-bottom:14px}.grid{grid-template-columns:1fr;gap:14px}.card{min-height:235px;padding:22px;border-radius:23px}.card-placeholder{min-height:235px;border-radius:23px}.card h2{font-size:28px}.move-handle{right:12px;top:12px}}
   </style>
 </head>
 <body>
@@ -49,7 +49,7 @@
   <script>
     const grid=document.getElementById('appGrid'),editBtn=document.getElementById('editLayout'),editNote=document.getElementById('editNote'),owner=document.getElementById('layoutOwner');
     const defaultOrder=['budget','calendar','shopping','home-control'];
-    let editing=false,dragging=null,dragHandle=null,session={access_detected:false,person:'',email:'',home_layout:[...defaultOrder]};
+    let editing=false,tileDrag=null,session={access_detected:false,person:'',email:'',home_layout:[...defaultOrder]};
 
     const now=new Date(),today=document.getElementById('today'),dateText=new Intl.DateTimeFormat('cs-CZ',{weekday:'long',day:'numeric',month:'long'}).format(now);
     today.textContent=dateText.charAt(0).toUpperCase()+dateText.slice(1);
@@ -93,24 +93,43 @@
       editBtn.textContent=editing?'Hotovo':'Upravit pořadí';
     }
     editBtn.addEventListener('click',()=>setEditing(!editing));
+    function startTileDrag(e){
+      if(!editing||tileDrag)return;
+      e.preventDefault();e.stopPropagation();
+      const handle=e.currentTarget,card=handle.closest('.card'),rect=card.getBoundingClientRect(),placeholder=document.createElement('div');
+      placeholder.className='card-placeholder';placeholder.style.height=rect.height+'px';
+      grid.insertBefore(placeholder,card);
+      card.classList.add('drag-ghost');card.style.width=rect.width+'px';card.style.height=rect.height+'px';card.style.left=rect.left+'px';card.style.top=rect.top+'px';
+      tileDrag={card,placeholder,handle,offsetX:e.clientX-rect.left,offsetY:e.clientY-rect.top};
+      document.body.classList.add('reordering');
+      try{handle.setPointerCapture(e.pointerId)}catch(_){}
+      moveTileGhost(e.clientX,e.clientY);
+      handle.addEventListener('pointermove',moveTileDrag);
+      handle.addEventListener('pointerup',finishTileDrag,{once:true});
+      handle.addEventListener('pointercancel',finishTileDrag,{once:true});
+    }
+    function moveTileGhost(x,y){
+      if(!tileDrag)return;
+      tileDrag.card.style.left=(x-tileDrag.offsetX)+'px';tileDrag.card.style.top=(y-tileDrag.offsetY)+'px';
+      const target=document.elementFromPoint(x,y)?.closest('.card');
+      if(!target||target===tileDrag.card||target.parentElement!==grid)return;
+      const rect=target.getBoundingClientRect();
+      const singleColumn=window.matchMedia('(max-width:720px)').matches;
+      const before=singleColumn?y<rect.top+rect.height/2:x<rect.left+rect.width/2;
+      if(before)grid.insertBefore(tileDrag.placeholder,target);else grid.insertBefore(tileDrag.placeholder,target.nextSibling);
+    }
+    function moveTileDrag(e){if(!tileDrag)return;e.preventDefault();moveTileGhost(e.clientX,e.clientY)}
+    function finishTileDrag(e){
+      if(!tileDrag)return;e.preventDefault();
+      const{card,placeholder,handle}=tileDrag;
+      handle.removeEventListener('pointermove',moveTileDrag);
+      card.classList.remove('drag-ghost');card.removeAttribute('style');
+      grid.insertBefore(card,placeholder);placeholder.remove();
+      tileDrag=null;document.body.classList.remove('reordering');saveOrder();
+    }
     grid.querySelectorAll('.card').forEach(card=>{
       card.addEventListener('click',e=>{if(editing)e.preventDefault()});
-      const handle=card.querySelector('.move-handle');
-      handle.addEventListener('pointerdown',e=>{
-        if(!editing)return;e.preventDefault();e.stopPropagation();dragging=card;dragHandle=handle;card.classList.add('dragging');document.body.classList.add('reordering');
-        try{handle.setPointerCapture(e.pointerId)}catch(_){}
-      });
-      handle.addEventListener('pointermove',e=>{
-        if(!dragging||dragHandle!==handle)return;e.preventDefault();
-        const target=document.elementFromPoint(e.clientX,e.clientY)?.closest('.card');
-        if(!target||target===dragging||target.parentElement!==grid)return;
-        const cards=[...grid.querySelectorAll('.card')],from=cards.indexOf(dragging),to=cards.indexOf(target);
-        if(to<from)grid.insertBefore(dragging,target);else grid.insertBefore(dragging,target.nextSibling);
-      });
-      const finish=e=>{
-        if(!dragging||dragHandle!==handle)return;e.preventDefault();dragging.classList.remove('dragging');dragging=null;dragHandle=null;document.body.classList.remove('reordering');saveOrder();
-      };
-      handle.addEventListener('pointerup',finish);handle.addEventListener('pointercancel',finish);
+      card.querySelector('.move-handle').addEventListener('pointerdown',startTileDrag);
     });
     loadSession();
   </script>
