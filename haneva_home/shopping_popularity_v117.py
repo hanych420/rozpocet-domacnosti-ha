@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 import math
 
 import shopping
+import shopping_integrations_v100 as source
 import shopping_list_v104 as listmod
 import shopping_official_base as core
 
@@ -257,6 +258,9 @@ def _rank(deal, query, history, choices, semantic):
 
 def get_grouped_deals(store="all", time_filter="current", query=""):
     data = _original_get_grouped_deals(store=store, time_filter=time_filter, query=query)
+    sync = dict(data.get("sync") or {})
+    sync["albert_last_success_at"] = source._meta_get("parse_albert_products_last_success")
+    data["sync"] = sync
     groups = list(data.get("groups") or [])
     if not groups:
         return data
