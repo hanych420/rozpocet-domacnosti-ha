@@ -49,8 +49,10 @@ COPY shopping_albert_v110.py /app/shopping_albert_v110.py
 COPY shopping_albert_runtime_v110.py /app/shopping_albert_runtime_v110.py
 COPY shopping_albert_packaging_v114.py /app/shopping_albert_packaging_v114.py
 COPY shopping_albert_list_meta_v110.py /app/shopping_albert_list_meta_v110.py
+COPY shopping_popularity_v117.py /app/shopping_popularity_v117.py
 COPY shopping_name_patch_v110.py /tmp/shopping_name_patch_v110.py
 COPY shopping_deals_patch_v113.py /tmp/shopping_deals_patch_v113.py
+COPY shopping_sync_status_v117.py /tmp/shopping_sync_status_v117.py
 COPY calendar_mobile_patch_v115.py /tmp/calendar_mobile_patch_v115.py
 COPY calendar_event_preview_v116.py /tmp/calendar_event_preview_v116.py
 COPY home.html /app/home.html
@@ -66,9 +68,10 @@ COPY run.sh /app/run.sh
 RUN python3 /tmp/gateway_patch_v105.py \
     && python3 /tmp/shopping_name_patch_v110.py \
     && python3 /tmp/shopping_deals_patch_v113.py \
+    && python3 /tmp/shopping_sync_status_v117.py \
     && python3 /tmp/calendar_mobile_patch_v115.py \
     && python3 /tmp/calendar_event_preview_v116.py \
-    && rm -f /tmp/gateway_patch_v105.py /tmp/shopping_name_patch_v110.py /tmp/shopping_deals_patch_v113.py /tmp/calendar_mobile_patch_v115.py /tmp/calendar_event_preview_v116.py \
+    && rm -f /tmp/gateway_patch_v105.py /tmp/shopping_name_patch_v110.py /tmp/shopping_deals_patch_v113.py /tmp/shopping_sync_status_v117.py /tmp/calendar_mobile_patch_v115.py /tmp/calendar_event_preview_v116.py \
     && sed -i 's/VERSION = "0.9.2"/VERSION = "0.11.7"/' /app/consolidated_gateway.py \
     && sed -i 's/VERSION = "0.10.0"/VERSION = "0.11.7"/' /app/shopping_integrations_v100.py \
     && sed -i 's/VERSION = "0.10.3"/VERSION = "0.11.7"/' /app/shopping_integrations_v102.py \
