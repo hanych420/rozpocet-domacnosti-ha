@@ -17,7 +17,7 @@ HA_API_BASE = "http://supervisor/core/api"
 TIMEOUT = 8
 DB_PATH = "/data/haneva_home_control.db"
 ALLOWED_DOMAINS = {"light", "switch", "fan", "climate"}
-ENTITY_RE = re.compile(r"^(light|switch|fan)\.[a-z0-9_]+$")
+ENTITY_RE = re.compile(r"^(light|switch|fan|climate)\.[a-z0-9_]+$")
 
 DEFAULT_ENTITIES = [
     ("switch.chodba", "Chodba", "Chodba", "🚪"),
@@ -131,6 +131,13 @@ def _state_payload(cfg, raw):
     domain = entity_id.split(".", 1)[0]
     state = str(raw.get("state") or "unknown")
     attrs = raw.get("attributes") or {}
+    current_temperature = attrs.get("current_temperature")
+    if domain == "climate" and current_temperature is None and entity_id == "climate.ac_96579049":
+        try:
+            sensor_state = _raw_state("sensor.ac_96579049_indoor_temperature").get("state")
+            current_temperature = float(sensor_state)
+        except Exception:
+            current_temperature = None
     modes = [str(x) for x in (attrs.get("supported_color_modes") or [])]
     brightness = attrs.get("brightness")
     try:
@@ -171,7 +178,7 @@ def _state_payload(cfg, raw):
         "hvac_modes": [str(x) for x in (attrs.get("hvac_modes") or [])] if domain == "climate" else [],
         "hvac_mode": state if domain == "climate" else None,
         "temperature": attrs.get("temperature") if domain == "climate" else None,
-        "current_temperature": attrs.get("current_temperature") if domain == "climate" else None,
+        "current_temperature": current_temperature if domain == "climate" else None,
         "min_temp": attrs.get("min_temp") if domain == "climate" else None,
         "max_temp": attrs.get("max_temp") if domain == "climate" else None,
         "target_temp_step": attrs.get("target_temp_step") if domain == "climate" else None,
