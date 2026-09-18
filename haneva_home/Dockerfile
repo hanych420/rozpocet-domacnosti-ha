@@ -35,6 +35,7 @@ COPY icon_gateway.py /app/icon_gateway.py
 COPY profile_gateway.py /app/profile_gateway.py
 COPY agenda_gateway.py /app/agenda_gateway.py
 COPY consolidated_gateway.py /app/consolidated_gateway.py
+COPY home_control.py /app/home_control.py
 COPY gateway_patch_v105.py /tmp/gateway_patch_v105.py
 COPY seed_holidays.py /app/seed_holidays.py
 COPY shopping.py /app/shopping.py
@@ -57,6 +58,7 @@ COPY calendar_mobile_patch_v115.py /tmp/calendar_mobile_patch_v115.py
 COPY calendar_event_preview_v116.py /tmp/calendar_event_preview_v116.py
 COPY calendar_datepicker_v118.py /tmp/calendar_datepicker_v118.py
 COPY home.html /app/home.html
+COPY smart_home.html /app/smart_home.html
 COPY calendar.html /app/calendar.html
 COPY shopping.html /app/shopping.html
 COPY shopping_deals.html /app/shopping_deals.html
@@ -74,9 +76,9 @@ RUN python3 /tmp/gateway_patch_v105.py \
     && python3 /tmp/calendar_event_preview_v116.py \
     && python3 /tmp/calendar_datepicker_v118.py \
     && rm -f /tmp/gateway_patch_v105.py /tmp/shopping_name_patch_v110.py /tmp/shopping_deals_patch_v113.py /tmp/shopping_sync_status_v117.py /tmp/calendar_mobile_patch_v115.py /tmp/calendar_event_preview_v116.py /tmp/calendar_datepicker_v118.py \
-    && sed -i 's/VERSION = "0.9.2"/VERSION = "0.11.8"/' /app/consolidated_gateway.py \
-    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.11.8"/' /app/shopping_integrations_v100.py \
-    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.11.8"/' /app/shopping_integrations_v102.py \
+    && sed -i 's/VERSION = "0.9.2"/VERSION = "0.11.9"/' /app/consolidated_gateway.py \
+    && sed -i 's/VERSION = "0.10.0"/VERSION = "0.11.9"/' /app/shopping_integrations_v100.py \
+    && sed -i 's/VERSION = "0.10.3"/VERSION = "0.11.9"/' /app/shopping_integrations_v102.py \
     && sed -i 's#Haneva kontroluje oficiální nabídky Lidlu a Albertu několikrát denně a ukládá jen textová data, ne obrázky letáků. Pokud se struktura některého webu změní, Kupi.cz zůstává jako záložní zdroj.#Lidl Haneva přebírá z integrace Lidl Weekly Offers v Home Assistantu. Albert používá spravované strukturované zdroje Parse.bot; PDF/OCR ani Kupi se už nepoužívají.#' /app/shopping_deals.html \
     && python3 -c 'from pathlib import Path; pairs=[("/app/shopping.html","/app/shopping_list_v104.snippet"),("/app/shopping_deals.html","/app/shopping_deals_v104.snippet")]; [(lambda p,s: p.write_text(p.read_text(encoding="utf-8").replace("</body>",s.read_text(encoding="utf-8")+"\n</body>",1),encoding="utf-8"))(Path(page),Path(snippet)) for page,snippet in pairs]'
 
