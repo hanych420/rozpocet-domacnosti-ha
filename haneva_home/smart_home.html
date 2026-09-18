@@ -7,105 +7,56 @@
   <title>Domov · Haneva</title>
   <style>
     :root{color-scheme:light;--bg:#f5f7fb;--surface:rgba(255,255,255,.94);--text:#172033;--muted:#737b89;--line:#e7eaf0;--shadow:0 18px 50px rgba(31,41,55,.09);--blue:#38bdf8}
-    *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-    body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 100% 0%,rgba(125,211,252,.23),transparent 29rem),radial-gradient(circle at 0% 0%,rgba(167,139,250,.17),transparent 30rem),var(--bg)}
-    button{font:inherit}
-    .wrap{width:min(820px,calc(100% - 24px));margin:0 auto;padding:22px 0 52px}
-    .top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:30px}
-    .back{display:inline-flex;align-items:center;gap:8px;color:#596174;text-decoration:none;font-size:14px;font-weight:800}
-    .brand{display:flex;align-items:center;gap:10px;font-weight:850}.brand-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#111827;color:#fff}
-    .hero{margin-bottom:22px}.hero h1{margin:0 0 8px;font-size:clamp(38px,9vw,60px);letter-spacing:-.05em;line-height:1}.hero p{margin:0;color:var(--muted);font-size:16px}
-    .room{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:26px;box-shadow:var(--shadow);overflow:hidden;backdrop-filter:blur(18px)}
-    .room-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:22px 22px 17px;border-bottom:1px solid var(--line)}
-    .room-title{display:flex;align-items:center;gap:13px}.room-icon{width:48px;height:48px;border-radius:16px;background:#eef8ff;display:grid;place-items:center;font-size:24px}.room h2{margin:0;font-size:27px;letter-spacing:-.03em}.room-sub{margin-top:3px;color:var(--muted);font-size:12px;font-weight:700}
-    .device{display:flex;align-items:center;gap:14px;padding:20px 22px}
-    .device-icon{width:44px;height:44px;border-radius:14px;background:#f3f4f6;display:grid;place-items:center;font-size:21px;flex:0 0 auto;transition:.2s}
-    .device.on .device-icon{background:#e0f2fe;box-shadow:0 0 0 6px rgba(56,189,248,.08)}
-    .device-main{min-width:0;flex:1}.device-name{font-size:18px;font-weight:820}.device-state{margin-top:3px;color:var(--muted);font-size:12px;font-weight:700}.device-state.error{color:#dc2626}
-    .switch{position:relative;width:58px;height:34px;border:0;border-radius:999px;background:#d7dbe2;padding:0;flex:0 0 auto;transition:background .18s;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(17,24,39,.08)}
-    .switch::after{content:"";position:absolute;top:4px;left:4px;width:26px;height:26px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.22);transition:transform .18s}
-    .switch.on{background:#38bdf8}.switch.on::after{transform:translateX(24px)}
-    .switch:disabled{opacity:.48;cursor:not-allowed}
-    .room-switch{width:64px;height:36px}.room-switch::after{width:28px;height:28px}.room-switch.on::after{transform:translateX(28px)}
-    .statusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:16px;color:#8b93a0;font-size:12px;font-weight:700}.dot{width:7px;height:7px;border-radius:50%;background:#22c55e}.dot.offline{background:#ef4444}
+    *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 100% 0%,rgba(125,211,252,.23),transparent 29rem),radial-gradient(circle at 0% 0%,rgba(167,139,250,.17),transparent 30rem),var(--bg)}
+    button{font:inherit}.wrap{width:min(960px,calc(100% - 24px));margin:0 auto;padding:22px 0 52px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:30px}.back{display:inline-flex;align-items:center;gap:8px;color:#596174;text-decoration:none;font-size:14px;font-weight:800}.brand{display:flex;align-items:center;gap:10px;font-weight:850}.brand-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:#111827;color:#fff}
+    .hero{margin-bottom:24px}.hero h1{margin:0 0 8px;font-size:clamp(38px,9vw,60px);letter-spacing:-.05em;line-height:1}.hero p{margin:0;color:var(--muted);font-size:16px}
+    .rooms{display:flex;flex-direction:column;gap:18px}.room{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:25px;box-shadow:var(--shadow);padding:18px;backdrop-filter:blur(18px)}.room-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.room-name{display:flex;align-items:center;gap:10px;min-width:0}.room-icon{width:40px;height:40px;border-radius:13px;background:#eef8ff;display:grid;place-items:center;font-size:20px}.room h2{margin:0;font-size:22px;letter-spacing:-.03em}.room-sub{margin-top:2px;color:var(--muted);font-size:11px;font-weight:700}
+    .device-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.device{min-width:0;border:1px solid #edf0f4;border-radius:18px;background:#fff;padding:15px;display:flex;flex-direction:column;gap:15px;box-shadow:0 7px 22px rgba(31,41,55,.05);transition:.18s}.device.on{border-color:#bae6fd;background:linear-gradient(145deg,#fff,#f0f9ff);box-shadow:0 10px 26px rgba(56,189,248,.11)}.device.unavailable{opacity:.58}.device-top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.device-icon{width:42px;height:42px;border-radius:13px;background:#f3f4f6;display:grid;place-items:center;font-size:21px}.device.on .device-icon{background:#e0f2fe;box-shadow:0 0 0 5px rgba(56,189,248,.07)}.device-name{font-size:15px;font-weight:850;line-height:1.2;overflow-wrap:anywhere}.device-meta{color:var(--muted);font-size:11px;font-weight:700;margin-top:4px}.device-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:auto}.device-state{font-size:12px;font-weight:800;color:#6b7280}.device.on .device-state{color:#0284c7}.device-state.error{color:#dc2626}
+    .switch{position:relative;width:52px;height:31px;border:0;border-radius:999px;background:#d7dbe2;padding:0;flex:0 0 auto;transition:background .18s;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(17,24,39,.08)}.switch::after{content:"";position:absolute;top:4px;left:4px;width:23px;height:23px;border-radius:50%;background:#fff;box-shadow:0 2px 7px rgba(15,23,42,.22);transition:transform .18s}.switch.on{background:#38bdf8}.switch.on::after{transform:translateX(21px)}.switch:disabled{opacity:.45;cursor:not-allowed}.room-switch{width:58px;height:34px}.room-switch::after{width:26px;height:26px}.room-switch.on::after{transform:translateX(24px)}
+    .statusline{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:18px;color:#8b93a0;font-size:12px;font-weight:700}.dot{width:7px;height:7px;border-radius:50%;background:#22c55e}.dot.offline{background:#ef4444}.empty{padding:28px;text-align:center;color:var(--muted)}
     .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom));transform:translate(-50%,12px);background:#111827;color:white;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:750;box-shadow:0 12px 34px rgba(17,24,39,.24);opacity:0;pointer-events:none;transition:.2s;z-index:50}.toast.show{opacity:1;transform:translate(-50%,0)}
-    @media(max-width:620px){.wrap{width:calc(100% - 18px);padding-top:14px}.top{margin-bottom:24px}.hero{padding:0 5px}.room-head{padding:18px 17px 15px}.device{padding:18px 17px}.room{border-radius:23px}.room h2{font-size:25px}}
+    @media(max-width:620px){.wrap{width:calc(100% - 18px);padding-top:14px}.top{margin-bottom:24px}.hero{padding:0 5px}.room{padding:13px;border-radius:22px}.room-head{padding:2px 2px 0}.device-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.device{padding:12px;border-radius:16px;gap:12px}.device-icon{width:38px;height:38px;font-size:19px}.device-name{font-size:13px}.device-meta{font-size:10px}.device-state{font-size:11px}.switch{width:46px;height:29px}.switch::after{width:21px;height:21px}.switch.on::after{transform:translateX(17px)}}
   </style>
 </head>
 <body>
   <main class="wrap">
     <div class="top"><a class="back" href="/">← Přehled</a><div class="brand"><span>Haneva</span><span class="brand-mark">H</span></div></div>
     <section class="hero"><h1>Domov</h1><p>Rychlé ovládání zařízení bez otevírání Home Assistantu.</p></section>
-
-    <section class="room">
-      <div class="room-head">
-        <div class="room-title"><div class="room-icon">🚪</div><div><h2>Chodba</h2><div class="room-sub" id="roomStatus">Načítám stav…</div></div></div>
-        <button class="switch room-switch" id="roomSwitch" type="button" aria-label="Zapnout nebo vypnout chodbu" disabled></button>
-      </div>
-      <div class="device" id="deviceRow">
-        <div class="device-icon">💡</div>
-        <div class="device-main"><div class="device-name">Chodba</div><div class="device-state" id="deviceState">Načítám…</div></div>
-        <button class="switch" id="deviceSwitch" type="button" aria-label="Zapnout nebo vypnout Chodbu" disabled></button>
-      </div>
-    </section>
+    <div class="rooms" id="rooms"><div class="empty">Načítám zařízení…</div></div>
     <div class="statusline"><span class="dot" id="connectionDot"></span><span id="connectionText">Připojuji k Home Assistantu…</span></div>
   </main>
   <div class="toast" id="toast"></div>
-
   <script>
-    const ENTITY='switch.chodba';
-    const roomSwitch=document.getElementById('roomSwitch');
-    const deviceSwitch=document.getElementById('deviceSwitch');
-    const row=document.getElementById('deviceRow');
-    const stateEl=document.getElementById('deviceState');
-    const roomStatus=document.getElementById('roomStatus');
-    const dot=document.getElementById('connectionDot');
-    const connectionText=document.getElementById('connectionText');
-    let entity=null,busy=false,toastTimer=null;
-
+    const roomsEl=document.getElementById('rooms'),dot=document.getElementById('connectionDot'),connectionText=document.getElementById('connectionText');
+    const roomIcons={'Obývací pokoj':'🛋️','Koupelna':'🚿','Ložnice':'🛏️','Chodba':'🚪'};
+    let entities=[],busy=new Set(),toastTimer=null,loading=false;
+    function esc(v=''){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]))}
     function toast(msg){const el=document.getElementById('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2400)}
-    function apply(){
-      const ok=entity&&entity.available;
-      const on=!!(entity&&entity.is_on);
-      [roomSwitch,deviceSwitch].forEach(btn=>{btn.classList.toggle('on',on);btn.disabled=!ok||busy;btn.setAttribute('aria-pressed',on?'true':'false')});
-      row.classList.toggle('on',on);
-      stateEl.textContent=!entity?'Načítám…':!ok?'Nedostupné':on?'Zapnuto':'Vypnuto';
-      stateEl.classList.toggle('error',!!entity&&!ok);
-      roomStatus.textContent=!entity?'Načítám stav…':!ok?'Zařízení není dostupné':on?'1 zařízení zapnuté':'Všechno vypnuté';
-      dot.classList.toggle('offline',!!entity&&!ok);
-      connectionText.textContent=!entity?'Připojuji k Home Assistantu…':ok?'Home Assistant připojen':'Home Assistant / zařízení nedostupné';
+    function grouped(){const map=new Map();entities.forEach(e=>{const room=e.room||'Ostatní';if(!map.has(room))map.set(room,[]);map.get(room).push(e)});return [...map.entries()]}
+    function render(){
+      if(!entities.length){roomsEl.innerHTML='<div class="empty">Žádná zařízení k zobrazení.</div>';return}
+      roomsEl.innerHTML=grouped().map(([room,items])=>{
+        const available=items.filter(x=>x.available),on=available.filter(x=>x.is_on),allOn=available.length>0&&on.length===available.length,roomBusy=items.some(x=>busy.has(x.entity_id));
+        const cards=items.map(e=>`<article class="device ${e.is_on?'on':''} ${e.available?'':'unavailable'}"><div class="device-top"><div class="device-icon">${esc(e.icon||'💡')}</div><div class="device-meta">${esc(e.domain==='fan'?'Větrák':e.domain==='switch'?'Spínač':'Světlo')}</div></div><div><div class="device-name">${esc(e.name||e.friendly_name||e.entity_id)}</div><div class="device-meta">${esc(room)}</div></div><div class="device-foot"><span class="device-state ${e.available?'':'error'}">${e.available?(e.is_on?'Zapnuto':'Vypnuto'):'Nedostupné'}</span><button class="switch ${e.is_on?'on':''}" type="button" data-entity="${esc(e.entity_id)}" aria-label="Přepnout ${esc(e.name||e.entity_id)}" ${!e.available||busy.has(e.entity_id)?'disabled':''}></button></div></article>`).join('');
+        return `<section class="room"><div class="room-head"><div class="room-name"><div class="room-icon">${roomIcons[room]||'🏠'}</div><div><h2>${esc(room)}</h2><div class="room-sub">${on.length} z ${available.length} zapnuto</div></div></div><button class="switch room-switch ${allOn?'on':''}" type="button" data-room="${esc(room)}" aria-label="Přepnout místnost ${esc(room)}" ${!available.length||roomBusy?'disabled':''}></button></div><div class="device-grid">${cards}</div></section>`;
+      }).join('');
+      document.querySelectorAll('[data-entity]').forEach(btn=>btn.addEventListener('click',()=>{const e=entities.find(x=>x.entity_id===btn.dataset.entity);if(e)setPower(e.entity_id,!e.is_on)}));
+      document.querySelectorAll('[data-room]').forEach(btn=>btn.addEventListener('click',()=>{const list=entities.filter(x=>x.room===btn.dataset.room&&x.available);const turnOn=list.some(x=>!x.is_on);setRoom(list,turnOn)}));
     }
-
     async function load(silent=false){
-      try{
-        const r=await fetch('/api/domov',{cache:'no-store'});
-        const data=await r.json();
-        if(!r.ok)throw new Error(data.error||'Stav se nepodařilo načíst.');
-        entity=(data.entities||[]).find(x=>x.entity_id===ENTITY)||null;
-      }catch(err){
-        entity={entity_id:ENTITY,available:false,is_on:false};
-        if(!silent)toast(err.message||'Home Assistant není dostupný.');
-      }
-      apply();
+      if(loading)return;loading=true;
+      try{const r=await fetch('/api/domov',{cache:'no-store'}),data=await r.json();if(!r.ok)throw new Error(data.error||'Stav se nepodařilo načíst.');entities=data.entities||[];const available=entities.filter(x=>x.available).length;dot.classList.toggle('offline',available===0);connectionText.textContent=available?('Home Assistant připojen · '+available+' zařízení dostupných'):'Zařízení nejsou dostupná';}
+      catch(err){dot.classList.add('offline');connectionText.textContent='Home Assistant není dostupný';if(!silent)toast(err.message||'Home Assistant není dostupný.')}
+      finally{loading=false;render()}
     }
-
-    async function setPower(turnOn){
-      if(busy||!entity||!entity.available)return;
-      busy=true;apply();
-      try{
-        const r=await fetch('/api/domov/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:ENTITY,turn_on:turnOn})});
-        const data=await r.json();
-        if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo ovládat.');
-        entity=data.entity;
-      }catch(err){toast(err.message||'Zařízení se nepodařilo ovládat.');await load(true)}
-      finally{busy=false;apply()}
+    async function setPower(entityId,turnOn){
+      if(busy.has(entityId))return;busy.add(entityId);render();
+      try{const r=await fetch('/api/domov/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:entityId,turn_on:turnOn})}),data=await r.json();if(!r.ok)throw new Error(data.error||'Zařízení se nepodařilo ovládat.');const idx=entities.findIndex(x=>x.entity_id===entityId);if(idx>=0)entities[idx]=data.entity;}
+      catch(err){toast(err.message||'Zařízení se nepodařilo ovládat.');await load(true)}
+      finally{busy.delete(entityId);render()}
     }
-
-    function toggle(){setPower(!(entity&&entity.is_on))}
-    roomSwitch.addEventListener('click',toggle);
-    deviceSwitch.addEventListener('click',toggle);
-    load();
-    setInterval(()=>{if(!busy)load(true)},5000);
+    async function setRoom(list,turnOn){for(const e of list)await setPower(e.entity_id,turnOn)}
+    load();setInterval(()=>{if(!busy.size)load(true)},5000);
   </script>
 </body>
 </html>
