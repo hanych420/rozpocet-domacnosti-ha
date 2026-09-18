@@ -29,7 +29,7 @@ DEFAULT_ENTITIES = [
     ("light.svetlo", "Ložnice", "Ložnice", "🛏️"),
     ("light.extended_color_light_7", "LED skříň", "Ložnice", "🌈"),
     ("light.extended_color_light_1", "Pracovna", "Ložnice", "🖥️"),
-    ("climate.ac_96579049", "Klimoška", "Ložnice", "❄️"),
+    ("climate.ac_96579049", "Klimoška", "Klimoška", "❄️"),
 ]
 
 
@@ -80,10 +80,21 @@ def init_db():
             conn.execute(
                 """INSERT OR IGNORE INTO entities(entity_id,name,room,icon,position)
                    VALUES(?,?,?,?,?)""",
-                ("climate.ac_96579049", "Klimoška", "Ložnice", "❄️", int(row["p"] if row else 0)),
+                ("climate.ac_96579049", "Klimoška", "Klimoška", "❄️", int(row["p"] if row else 0)),
             )
             conn.execute(
                 "INSERT OR REPLACE INTO meta(key,value) VALUES('climate_seeded_v2','1')"
+            )
+        climate_section = conn.execute(
+            "SELECT value FROM meta WHERE key='climate_section_v3'"
+        ).fetchone()
+        if not climate_section:
+            conn.execute(
+                """UPDATE entities SET room='Klimoška', updated_at=CURRENT_TIMESTAMP
+                   WHERE entity_id='climate.ac_96579049' AND room='Ložnice'"""
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO meta(key,value) VALUES('climate_section_v3','1')"
             )
         conn.commit()
 
