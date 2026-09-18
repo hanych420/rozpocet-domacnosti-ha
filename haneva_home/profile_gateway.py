@@ -1,5 +1,6 @@
 from http.server import ThreadingHTTPServer
 from urllib.parse import urlparse
+import json
 import os
 import sqlite3
 
@@ -19,6 +20,7 @@ app.DEFAULT_COLORS[PROP_CALENDAR] = PROP_COLOR
 
 ALLOWED_PROFILE_CALENDARS = set(app.ALLOWED_CALENDARS)
 PERSONS = {"hanych", "eva"}
+HOME_TILES = ("budget", "calendar", "shopping", "home-control")
 
 PROFILE_STYLE = """
 <style id="haneva-calendar-profile-v1">
@@ -119,9 +121,13 @@ def init_profile_db():
                 email TEXT PRIMARY KEY,
                 person TEXT NOT NULL DEFAULT '',
                 last_calendar TEXT NOT NULL DEFAULT '',
+                home_layout TEXT NOT NULL DEFAULT '',
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )'''
         )
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()}
+        if "home_layout" not in columns:
+            conn.execute("ALTER TABLE profiles ADD COLUMN home_layout TEXT NOT NULL DEFAULT ''")
         conn.commit()
 
 
@@ -139,15 +145,39 @@ def access_email(handler):
     return ""
 
 
+def _normalize_home_layout(value):
+    raw = value
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw) if raw else []
+        except Exception:
+            raw = []
+    if not isinstance(raw, (list, tuple)):
+        raw = []
+    result = []
+    for item in raw:
+        key = str(item or "").strip()
+        if key in HOME_TILES and key not in result:
+            result.append(key)
+    for key in HOME_TILES:
+        if key not in result:
+            result.append(key)
+    return result
+
+
 def read_profile(email):
     if not email:
-        return {"person": "", "last_calendar": ""}
+        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES)}
     with sqlite3.connect(PROFILE_DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        row = conn.execute("SELECT person, last_calendar FROM profiles WHERE email=?", (email,)).fetchone()
+        row = conn.execute("SELECT person, last_calendar, home_layout FROM profiles WHERE email=?", (email,)).fetchone()
     if not row:
-        return {"person": "", "last_calendar": ""}
-    return {"person": row["person"] or "", "last_calendar": row["last_calendar"] or ""}
+        return {"person": "", "last_calendar": "", "home_layout": list(HOME_TILES)}
+    return {
+        "person": row["person"] or "",
+        "last_calendar": row["last_calendar"] or "",
+        "home_layout": _normalize_home_layout(row["home_layout"]),
+    }
 
 
 def save_person(email, person):
@@ -176,6 +206,21 @@ def save_last_calendar(email, calendar):
         conn.commit()
 
 
+def save_home_layout(email, layout):
+    normalized = _normalize_home_layout(layout)
+    if set(normalized) != set(HOME_TILES) or len(normalized) != len(HOME_TILES):
+        raise ValueError("Neplatné pořadí dlaždic.")
+    with sqlite3.connect(PROFILE_DB_PATH) as conn:
+        conn.execute(
+            '''INSERT INTO profiles(email, person, last_calendar, home_layout, updated_at)
+               VALUES(?, '', '', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(email) DO UPDATE SET home_layout=excluded.home_layout, updated_at=CURRENT_TIMESTAMP''',
+            (email, json.dumps(normalized, ensure_ascii=False)),
+        )
+        conn.commit()
+    return normalized
+
+
 def session_payload(email):
     profile = read_profile(email)
     person = profile["person"] if profile["person"] in PERSONS else ""
@@ -192,6 +237,7 @@ def session_payload(email):
         "person": person,
         "last_calendar": last_calendar,
         "default_calendar": default_calendar,
+        "home_layout": profile.get("home_layout") or list(HOME_TILES),
     }
 
 
@@ -299,7 +345,7 @@ class ProfileGatewayHandler(icon_gateway.IconGatewayHandler):
 
     def do_PUT(self):
         path = urlparse(self.path).path
-        if path not in {"/api/session/profile", "/api/session/calendar"}:
+        if path not in {"/api/session/profile", "/api/session/calendar", "/api/session/home-layout"}:
             return super().do_PUT()
 
         email = access_email(self)
@@ -311,8 +357,10 @@ class ProfileGatewayHandler(icon_gateway.IconGatewayHandler):
             payload = self.read_json()
             if path == "/api/session/profile":
                 save_person(email, str(payload.get("person", "")).strip().lower())
-            else:
+            elif path == "/api/session/calendar":
                 save_last_calendar(email, str(payload.get("calendar", "")).strip().lower())
+            else:
+                save_home_layout(email, payload.get("layout"))
             self.send_json(session_payload(email))
         except (ValueError, TypeError) as exc:
             self.send_json({"error": str(exc)}, 400)
