@@ -253,6 +253,13 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 self.send_json({"error": str(exc)}, 502)
             return
 
+        if path == "/api/domov/config":
+            try:
+                self.send_json(home_control.get_config())
+            except Exception as exc:
+                self.send_json({"error": str(exc)}, 500)
+            return
+
         if path in ("/nakupy/akce", "/nakupy/akce/"):
             try:
                 self.send_bytes(app.read_page(SHOPPING_DEALS_HTML_PATH))
@@ -296,14 +303,45 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             try:
                 payload = self.read_json()
                 entity_id = payload.get("entity_id")
-                turn_on = bool(payload.get("turn_on"))
-                self.send_json({"entity": home_control.set_entity(entity_id, turn_on)})
+                turn_on = payload.get("turn_on") if "turn_on" in payload else None
+                brightness_pct = payload.get("brightness_pct")
+                rgb_color = payload.get("rgb_color")
+                self.send_json({
+                    "entity": home_control.set_entity(
+                        entity_id,
+                        turn_on=turn_on,
+                        brightness_pct=brightness_pct,
+                        rgb_color=rgb_color,
+                    )
+                })
             except ValueError as exc:
                 self.send_json({"error": str(exc)}, 400)
             except KeyError as exc:
                 self.send_json({"error": str(exc.args[0])}, 404)
             except Exception as exc:
                 self.send_json({"error": f"Home Assistant nereaguje: {exc}"}, 502)
+            return
+
+        if path == "/api/domov/config/entity":
+            try:
+                self.send_json({"entity": home_control.add_entity(self.read_json())}, 201)
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, 400)
+            except KeyError as exc:
+                self.send_json({"error": str(exc.args[0])}, 404)
+            except Exception as exc:
+                self.send_json({"error": f"Zařízení se nepodařilo přidat: {exc}"}, 502)
+            return
+
+        if path == "/api/domov/config/entity/remove":
+            try:
+                payload = self.read_json()
+                home_control.remove_entity(payload.get("entity_id"))
+                self.send_json({"ok": True})
+            except KeyError as exc:
+                self.send_json({"error": str(exc.args[0])}, 404)
+            except Exception as exc:
+                self.send_json({"error": str(exc)}, 400)
             return
 
         if path == "/api/shopping/sync-official":
@@ -337,6 +375,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 if __name__ == "__main__":
     profile_gateway.init_profile_db()
     app.init_db()
+    home_control.init_db()
     shopping_official.init_db()
     shopping_official.start_worker()
     server = ThreadingHTTPServer((gateway.HOST, gateway.PORT), ConsolidatedGatewayHandler)
