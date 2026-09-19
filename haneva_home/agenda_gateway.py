@@ -103,7 +103,8 @@ AGENDA_JS = r"""
       const time=e.all_day?'Celý den':[e.start_time,e.end_time].filter(Boolean).join('–');
       const loc=e.location?` · ${e.location}`:'';
       const repeat=e.recurrence==='yearly'?' · každý rok':'';
-      btn.innerHTML=`<span class="agenda-date-range">${escapeHtml(agendaDateLabel(e))}</span><span class="agenda-bar ${e.calendar}"></span><span class="agenda-main"><span class="agenda-title">${escapeHtml(e.title)}</span><span class="agenda-meta">${escapeHtml(`${time}${loc}`)}${repeat}</span></span>`;
+      const ticket=e.has_ticket?' · 🎟️ vstupenka':'';
+      btn.innerHTML=`<span class="agenda-date-range">${escapeHtml(agendaDateLabel(e))}</span><span class="agenda-bar ${e.calendar}"></span><span class="agenda-main"><span class="agenda-title">${escapeHtml(e.title)}</span><span class="agenda-meta">${escapeHtml(`${time}${loc}${ticket}`)}${repeat}</span></span>`;
       btn.addEventListener('click',()=>openEdit(e));
       list.appendChild(btn);
     });
@@ -173,16 +174,16 @@ def agenda_events(range_mode):
     with app.db() as conn:
         if end is None:
             normal = conn.execute(
-                "SELECT * FROM events WHERE recurrence='none' AND end_date >= ? ORDER BY start_date, start_time",
+                f"SELECT {app.ticket_select_sql()} FROM events e WHERE recurrence='none' AND end_date >= ? ORDER BY start_date, start_time",
                 (start.isoformat(),),
             ).fetchall()
         else:
             normal = conn.execute(
-                "SELECT * FROM events WHERE recurrence='none' AND end_date >= ? AND start_date <= ? ORDER BY start_date, start_time",
+                f"SELECT {app.ticket_select_sql()} FROM events e WHERE recurrence='none' AND end_date >= ? AND start_date <= ? ORDER BY start_date, start_time",
                 (start.isoformat(), end.isoformat()),
             ).fetchall()
         recurring = conn.execute(
-            "SELECT * FROM events WHERE recurrence='yearly' ORDER BY start_date, start_time"
+            f"SELECT {app.ticket_select_sql()} FROM events e WHERE recurrence='yearly' ORDER BY start_date, start_time"
         ).fetchall()
 
     for row in normal:

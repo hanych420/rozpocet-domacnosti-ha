@@ -101,6 +101,26 @@
     .field input:focus,.field select:focus,.field textarea:focus{border-color:#94a3b8;box-shadow:0 0 0 3px rgba(148,163,184,.15)}
     .field textarea{min-height:86px;resize:vertical}
     .checkline{display:flex;align-items:center;gap:8px;padding-top:5px}.checkline input{width:17px;height:17px}
+    .ticket-field{border:1px solid #e6e1ff;border-radius:15px;padding:13px;background:#faf9ff;gap:10px}
+    .ticket-field[hidden]{display:none}
+    .ticket-people{display:flex;flex-direction:column;gap:9px}
+    .ticket-person{border:1px solid #e6e1ff;border-radius:13px;padding:11px;background:#fff}
+    .ticket-person-name{font-size:13px;font-weight:900;color:#453a65;margin-bottom:8px}
+    .ticket-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .ticket-picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+    .ticket-pick{display:inline-flex;align-items:center;justify-content:center;border:1px solid #dcd5ff;background:#fff;color:#51467c;border-radius:11px;padding:9px 12px;font-size:13px;font-weight:800;cursor:pointer}
+    .ticket-status{font-size:12px;color:#716b7f;overflow-wrap:anywhere}
+    .ticket-actions{display:flex;gap:8px;flex-wrap:wrap}
+    .ticket-actions[hidden],.ticket-qr[hidden],.ticket-no-qr[hidden]{display:none}
+    .ticket-actions button,.ticket-actions a{border:1px solid #e4e0f4;background:#fff;color:#51467c;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:800;text-decoration:none}
+    .ticket-help{margin:0;color:#8b8498;font-size:11px;line-height:1.4}
+    #ticketDialog{width:min(520px,calc(100% - 24px))}
+    .ticket-viewer{padding:20px;text-align:center}
+    .ticket-viewer .modal-head{text-align:left}
+    .ticket-qr{display:block;width:min(100%,380px);max-height:62vh;object-fit:contain;margin:0 auto 14px;border-radius:18px;background:#fff;border:1px solid var(--line)}
+    .ticket-no-qr{padding:34px 18px;margin-bottom:14px;border-radius:16px;background:#f7f5ff;color:#655c78;line-height:1.5}
+    .ticket-viewer-actions{display:flex;justify-content:center;gap:9px;flex-wrap:wrap}
+    .ticket-viewer-actions a{display:inline-flex;text-decoration:none}
     .actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:22px}
     .actions-right{display:flex;gap:9px;margin-left:auto}
     .secondary,.danger{border:1px solid var(--line);background:#fff;color:#4b5563;border-radius:12px;padding:10px 14px;font-weight:800}
@@ -181,6 +201,7 @@
       <div class="field full"><label for="title">Název</label><input id="title" required maxlength="200" placeholder="Např. koncert, návštěva, zubař…"></div>
       <div class="field"><label for="calendar">Kalendář</label><select id="calendar"><option value="hanych">Hanych</option><option value="eva">Eva</option><option value="spolecne" selected>Společné</option><option value="narozeniny">Narozeniny</option><option value="kumi">🐕 Hlídání Kumi</option></select></div>
       <div class="field"><label for="recurrence">Opakování</label><select id="recurrence"><option value="none">Neopakovat</option><option value="yearly">Každý rok</option></select></div>
+      <div class="field full"><label for="eventType">Typ události</label><select id="eventType"><option value="">Běžná událost</option><option value="zabava">🎟️ Zábava – divadlo, koncert…</option></select></div>
       <div class="field"><label for="startDate">Od</label><input id="startDate" type="date" required></div>
       <div class="field"><label for="endDate">Do</label><input id="endDate" type="date" required></div>
       <div class="field full"><label class="checkline"><input id="allDay" type="checkbox" checked> Celý den</label></div>
@@ -188,9 +209,34 @@
       <div class="field time-field"><label for="endTime">Čas do</label><input id="endTime" type="time"></div>
       <div class="field full"><label for="location">Místo</label><input id="location" maxlength="250" placeholder="Volitelné"></div>
       <div class="field full"><label for="notes">Poznámka</label><textarea id="notes" maxlength="2000" placeholder="Volitelné"></textarea></div>
+      <div class="field full ticket-field" id="ticketField" hidden>
+        <label>Vstupenky</label>
+        <div class="ticket-people" id="ticketPeople">
+          <section class="ticket-person" data-ticket-owner="hanych">
+            <div class="ticket-person-name">Hanych</div>
+            <div class="ticket-picker"><label class="ticket-pick" for="ticketFileHanych">＋ Nahrát Hanychovu</label><input id="ticketFileHanych" data-ticket-file="hanych" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><span class="ticket-status" data-ticket-status="hanych">PDF nebo obrázek, maximálně 15 MB</span></div>
+            <div class="ticket-actions" data-ticket-actions="hanych" hidden><button type="button" data-show-ticket="hanych">🎟️ Zobrazit QR</button><a data-original-ticket="hanych" target="_blank" rel="noopener">Původní PDF</a><button type="button" data-remove-ticket="hanych">Odstranit</button></div>
+          </section>
+          <section class="ticket-person" data-ticket-owner="eva">
+            <div class="ticket-person-name">Eva</div>
+            <div class="ticket-picker"><label class="ticket-pick" for="ticketFileEva">＋ Nahrát Evinu</label><input id="ticketFileEva" data-ticket-file="eva" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><span class="ticket-status" data-ticket-status="eva">PDF nebo obrázek, maximálně 15 MB</span></div>
+            <div class="ticket-actions" data-ticket-actions="eva" hidden><button type="button" data-show-ticket="eva">🎟️ Zobrazit QR</button><a data-original-ticket="eva" target="_blank" rel="noopener">Původní PDF</a><button type="button" data-remove-ticket="eva">Odstranit</button></div>
+          </section>
+        </div>
+        <p class="ticket-help">Oba uvidíte obě vstupenky. Haneva z každého souboru vyřízne jeho vlastní QR a přihlášenému uživateli dá jeho vstupenku jako první.</p>
+      </div>
     </div>
     <div class="actions"><button class="danger" type="button" id="deleteEvent">Smazat</button><div class="actions-right"><button class="secondary" type="button" id="cancelDialog">Zrušit</button><button class="save" type="submit">Uložit</button></div></div>
   </form></dialog>
+
+  <dialog id="ticketDialog">
+    <div class="ticket-viewer">
+      <div class="modal-head"><h2 id="ticketViewerTitle">Vstupenka</h2><button class="close" type="button" id="closeTicket" aria-label="Zavřít">×</button></div>
+      <img class="ticket-qr" id="ticketQr" alt="QR kód vstupenky" hidden>
+      <div class="ticket-no-qr" id="ticketNoQr" hidden>QR kód se nepodařilo samostatně vyříznout. Otevři původní vstupenku.</div>
+      <div class="ticket-viewer-actions"><a class="save" id="ticketOriginalViewer" target="_blank" rel="noopener">Otevřít původní soubor</a></div>
+    </div>
+  </dialog>
 
   <dialog id="settingsDialog">
     <form class="modal" id="settingsForm">
@@ -223,7 +269,10 @@
       autoKumiTitle:false,
       suppressClickUntil:0,
       colors:{...defaultColors},
-      expandedDays:new Set()
+      expandedDays:new Set(),
+      tickets:{hanych:null,eva:null},
+      ticketFiles:{hanych:null,eva:null},
+      removeTickets:new Set()
     };
     const mouseGesture={kind:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
     const touchGesture={kind:null,timer:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
@@ -314,7 +363,8 @@
     function eventLabel(e){
       const prefix=e.all_day||!e.start_time?'':`${e.start_time} `;
       const repeat=!isHoliday(e)&&e.recurrence==='yearly'?' ↻':'';
-      return`${prefix}${e.title}${repeat}`;
+      const ticket=e.has_ticket?' 🎟️':'';
+      return`${prefix}${e.title}${ticket}${repeat}`;
     }
 
     function agendaDateLabel(e){
@@ -402,7 +452,8 @@
         const time=e.all_day?'Celý den':[e.start_time,e.end_time].filter(Boolean).join('–');
         const loc=e.location?` · ${e.location}`:'';
         const repeat=e.recurrence==='yearly'?' · každý rok':'';
-        btn.innerHTML=`<span class="agenda-date-range">${escapeHtml(agendaDateLabel(e))}</span><span class="agenda-bar ${e.calendar}"></span><span class="agenda-main"><span class="agenda-title">${escapeHtml(e.title)}</span><span class="agenda-meta">${escapeHtml(`${time}${loc}`)}${repeat}</span></span>`;
+        const ticket=e.has_ticket?' · 🎟️ vstupenka':'';
+        btn.innerHTML=`<span class="agenda-date-range">${escapeHtml(agendaDateLabel(e))}</span><span class="agenda-bar ${e.calendar}"></span><span class="agenda-main"><span class="agenda-title">${escapeHtml(e.title)}</span><span class="agenda-meta">${escapeHtml(`${time}${loc}${ticket}`)}${repeat}</span></span>`;
         btn.addEventListener('click',()=>openEdit(e));
         list.appendChild(btn);
       });
@@ -562,6 +613,46 @@
       document.querySelectorAll('.time-field').forEach(el=>el.style.opacity=disabled?'.45':'1');
     }
 
+    function syncTicketField(){
+      const entertainment=$('eventType').value==='zabava';
+      $('ticketField').hidden=!entertainment;
+      if(!entertainment){
+        state.ticketFiles={hanych:null,eva:null};
+        document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
+        return;
+      }
+      const person=(typeof sessionState!=='undefined'&&['hanych','eva'].includes(sessionState.person))?sessionState.person:'';
+      const order=person?[person,person==='hanych'?'eva':'hanych']:['hanych','eva'];
+      const people=$('ticketPeople');
+      order.forEach(owner=>people.appendChild(document.querySelector(`[data-ticket-owner="${owner}"]`)));
+      order.forEach(owner=>{
+        const selected=state.ticketFiles[owner];
+        const current=state.removeTickets.has(owner)?null:state.tickets[owner];
+        const status=document.querySelector(`[data-ticket-status="${owner}"]`);
+        if(selected)status.textContent=`Připraveno: ${selected.name}`;
+        else if(current)status.textContent=current.qr_url?`${current.name} · QR nalezen`:`${current.name} · bez samostatného QR`;
+        else status.textContent='PDF nebo obrázek, maximálně 15 MB';
+        document.querySelector(`[data-ticket-actions="${owner}"]`).hidden=!current;
+        if(current)document.querySelector(`[data-original-ticket="${owner}"]`).href=current.original_url;
+      });
+    }
+
+    function showTicket(owner){
+      const ticket=state.tickets[owner];
+      if(!ticket)return;
+      $('ticketViewerTitle').textContent=`Vstupenka · ${ticket.owner_label}`;
+      $('ticketQr').hidden=!ticket.qr_url;
+      $('ticketNoQr').hidden=!!ticket.qr_url;
+      if(ticket.qr_url)$('ticketQr').src=`${ticket.qr_url}?v=${Date.now()}`;
+      $('ticketOriginalViewer').href=ticket.original_url;
+      $('ticketDialog').showModal();
+    }
+
+    function closeTicket(){
+      $('ticketDialog').close();
+      $('ticketQr').removeAttribute('src');
+    }
+
     function resetForm(){
       $('eventForm').reset();
       $('calendar').value='spolecne';
@@ -571,7 +662,13 @@
       state.editingId=null;
       state.autoBirthdayRecurrence=false;
       state.autoKumiTitle=false;
+      state.tickets={hanych:null,eva:null};
+      state.ticketFiles={hanych:null,eva:null};
+      state.removeTickets=new Set();
+      $('eventType').value='';
+      document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
       syncTimeFields();
+      syncTicketField();
     }
 
     function openNew(startDate=null,endDate=null){
@@ -595,6 +692,7 @@
       $('title').value=e.title||'';
       $('calendar').value=e.calendar;
       $('recurrence').value=e.recurrence||'none';
+      $('eventType').value=e.event_type||'';
       $('startDate').value=e.start_date;
       $('endDate').value=e.end_date;
       $('allDay').checked=!!e.all_day;
@@ -602,8 +700,14 @@
       $('endTime').value=e.end_time||'';
       $('location').value=e.location||'';
       $('notes').value=e.notes||'';
+      state.tickets={hanych:null,eva:null};
+      (e.tickets||[]).forEach(ticket=>state.tickets[ticket.owner]=ticket);
+      state.ticketFiles={hanych:null,eva:null};
+      state.removeTickets=new Set();
+      document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
       $('deleteEvent').style.display='inline-block';
       syncTimeFields();
+      syncTicketField();
       $('eventDialog').showModal();
     }
 
@@ -616,6 +720,7 @@
         calendar:$('calendar').value,
         recurrence:$('recurrence').value,
         start_date:$('startDate').value,
+        event_type:$('eventType').value,
         end_date:$('endDate').value||$('startDate').value,
         all_day:$('allDay').checked,
         start_time:$('startTime').value,
@@ -629,8 +734,31 @@
       const data=await res.json();
       if(!res.ok){toast(data.error||'Událost se nepodařilo uložit.');return}
       const edited=!!state.editingId;
+      const eventId=data.event.id;
+      state.editingId=eventId;
+      for(const owner of ['hanych','eva']){
+        if(state.removeTickets.has(owner)&&state.tickets[owner]){
+          const ticketDelete=await fetch(`/api/events/${eventId}/tickets/${owner}`,{method:'DELETE'});
+          if(!ticketDelete.ok&&ticketDelete.status!==404){
+            const error=await ticketDelete.json();
+            toast(error.error||'Vstupenku se nepodařilo odstranit.');
+            return;
+          }
+        }
+        if(state.ticketFiles[owner]){
+          const file=state.ticketFiles[owner];
+          const upload=await fetch(`/api/events/${eventId}/tickets/${owner}`,{
+            method:'POST',
+            headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':encodeURIComponent(file.name)},
+            body:file
+          });
+          const uploaded=await upload.json();
+          if(!upload.ok){toast(uploaded.error||'Vstupenku se nepodařilo nahrát.');return}
+        }
+      }
       closeDialog();
-      toast(edited?'Událost upravena.':'Událost přidána.');
+      const changedTickets=Object.values(state.ticketFiles).some(Boolean)||state.removeTickets.size>0;
+      toast(changedTickets?(edited?'Událost a vstupenky upraveny.':'Událost a vstupenky přidány.'):(edited?'Událost upravena.':'Událost přidána.'));
       await loadEvents();
     }
 
@@ -728,6 +856,23 @@
     });
 
     $('allDay').addEventListener('change',syncTimeFields);
+    $('eventType').addEventListener('change',syncTicketField);
+    document.querySelectorAll('[data-ticket-file]').forEach(input=>input.addEventListener('change',()=>{
+      const owner=input.dataset.ticketFile,file=input.files[0]||null;
+      if(file&&file.size>15*1024*1024){toast('Vstupenka může mít nejvýše 15 MB.');input.value='';return}
+      state.ticketFiles[owner]=file;
+      state.removeTickets.delete(owner);
+      syncTicketField();
+    }));
+    document.querySelectorAll('[data-show-ticket]').forEach(button=>button.addEventListener('click',()=>showTicket(button.dataset.showTicket)));
+    document.querySelectorAll('[data-remove-ticket]').forEach(button=>button.addEventListener('click',()=>{
+      const owner=button.dataset.removeTicket,label=owner==='hanych'?'Hanychovu':'Evinu';
+      if(!confirm(`Odstranit ${label} vstupenku z události?`))return;
+      state.removeTickets.add(owner);state.ticketFiles[owner]=null;
+      document.querySelector(`[data-ticket-file="${owner}"]`).value='';syncTicketField();
+    }));
+    $('closeTicket').addEventListener('click',closeTicket);
+    $('ticketDialog').addEventListener('click',e=>{if(e.target===$('ticketDialog'))closeTicket()});
     $('eventForm').addEventListener('submit',saveEvent);
     $('deleteEvent').addEventListener('click',deleteEvent);
     $('closeDialog').addEventListener('click',closeDialog);
