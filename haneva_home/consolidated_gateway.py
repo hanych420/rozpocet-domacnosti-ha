@@ -308,16 +308,27 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 rgb_color = payload.get("rgb_color")
                 hvac_mode = payload.get("hvac_mode")
                 temperature = payload.get("temperature")
-                self.send_json({
-                    "entity": home_control.set_entity(
-                        entity_id,
-                        turn_on=turn_on,
-                        brightness_pct=brightness_pct,
-                        rgb_color=rgb_color,
-                        hvac_mode=hvac_mode,
-                        temperature=temperature,
+                entity = home_control.set_entity(
+                    entity_id,
+                    turn_on=turn_on,
+                    brightness_pct=brightness_pct,
+                    rgb_color=rgb_color,
+                    hvac_mode=hvac_mode,
+                    temperature=temperature,
+                )
+                if turn_on is not None:
+                    name = str(entity.get("name") or "").lower()
+                    icon = str(entity.get("icon") or "")
+                    is_light_like = (
+                        entity.get("domain") == "light"
+                        or (
+                            entity.get("domain") == "switch"
+                            and (icon == "💡" or "světlo" in name or "svetlo" in name or "light" in name)
+                        )
                     )
-                })
+                    if is_light_like:
+                        profile_gateway.record_light_usage(profile_gateway.access_email(self), entity_id)
+                self.send_json({"entity": entity})
             except ValueError as exc:
                 self.send_json({"error": str(exc)}, 400)
             except KeyError as exc:
