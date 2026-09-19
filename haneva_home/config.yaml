@@ -1,7 +1,7 @@
 name: "Haneva Home"
-version: "0.12.6"
+version: "0.13.0"
 slug: "haneva_home"
-description: "Domovský rozcestník pro rozpočet, společný kalendář a nákupy."
+description: "Domovský přehled pro rozpočet, kalendář, domácnost a další společné aplikace."
 init: false
 startup: application
 boot: auto
