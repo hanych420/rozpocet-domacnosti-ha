@@ -16,6 +16,13 @@
     .today{color:var(--muted);font-size:14px;font-weight:650;text-align:right}
     .hero{max-width:820px;margin-bottom:28px}.eyebrow{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.68);border:1px solid rgba(255,255,255,.85);color:#596174;font-size:13px;font-weight:750;box-shadow:0 8px 28px rgba(31,41,55,.05)}
     h1{margin:18px 0 12px;font-size:clamp(40px,7vw,72px);line-height:.98;letter-spacing:-.055em;max-width:820px}.lead{margin:0;color:var(--muted);font-size:clamp(17px,2.2vw,21px);line-height:1.55;max-width:680px}
+    .recap-grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr) minmax(0,1.55fr);gap:14px;margin:0 0 30px}
+    .recap-card{min-width:0;border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.72);box-shadow:0 12px 34px rgba(31,41,55,.07);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:20px;padding:18px;color:inherit;text-decoration:none}
+    a.recap-card{transition:transform .16s ease,box-shadow .16s ease}a.recap-card:hover{transform:translateY(-2px);box-shadow:0 18px 40px rgba(31,41,55,.10)}
+    .recap-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}.recap-kicker{font-size:11px;font-weight:850;letter-spacing:.075em;text-transform:uppercase;color:#7b8492}.recap-link{color:#7b8492;text-decoration:none;font-size:12px;font-weight:800}.recap-link:hover{color:#172033}
+    .money-value{font-size:clamp(27px,3.2vw,38px);font-weight:900;letter-spacing:-.05em;line-height:1.05;white-space:nowrap}.money-value.negative{color:#b91c1c}.recap-note{margin-top:7px;color:#8a92a0;font-size:12px;font-weight:650}
+    .today-events{display:flex;flex-direction:column;gap:8px}.today-event{display:grid;grid-template-columns:54px minmax(0,1fr);gap:9px;align-items:center}.event-time{font-size:12px;font-weight:850;color:#596174}.event-title{font-size:13px;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.event-empty{color:#8a92a0;font-size:13px;font-weight:650;padding:3px 0 2px}
+    .quick-lights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.quick-light{appearance:none;border:1px solid #e7eaf0;background:rgba(255,255,255,.78);border-radius:14px;padding:10px 11px;display:flex;align-items:center;gap:9px;text-align:left;color:#3f4859;min-width:0;cursor:pointer;transition:background .15s ease,border-color .15s ease,transform .15s ease}.quick-light:hover{transform:translateY(-1px)}.quick-light.on{background:#fff8d9;border-color:#f5d66f;color:#5f4a00}.quick-light.unavailable{opacity:.48;cursor:not-allowed}.quick-light-icon{font-size:18px;line-height:1}.quick-light-copy{min-width:0;flex:1}.quick-light-name{font-size:12px;font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.quick-light-state{font-size:10px;font-weight:750;color:#8a92a0;margin-top:2px}.quick-light.on .quick-light-state{color:#9a7600}.quick-light-dot{width:8px;height:8px;border-radius:50%;background:#cbd5e1;flex:0 0 auto}.quick-light.on .quick-light-dot{background:#f59e0b;box-shadow:0 0 0 4px rgba(245,158,11,.12)}
     .layout-bar{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:0 0 18px;padding:0 2px}.layout-owner{color:#8a92a0;font-size:12px;font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.layout-edit{border:1px solid rgba(255,255,255,.9);background:rgba(255,255,255,.78);color:#465064;border-radius:12px;padding:9px 12px;font-size:12px;font-weight:800;box-shadow:0 8px 22px rgba(31,41,55,.06)}
     .layout-edit.active{background:#111827;color:#fff;border-color:#111827}
     .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:18px}
@@ -28,14 +35,29 @@
     .grid.editing .move-handle{display:grid}.grid.editing .card{cursor:default}.grid.editing a.card:hover{transform:none}.card.drag-ghost{position:fixed!important;z-index:160!important;pointer-events:none!important;opacity:.76!important;transform:scale(.985)!important;box-shadow:0 30px 80px rgba(31,41,55,.24)!important;margin:0!important}.card-placeholder{min-height:280px;border:2px dashed #94a3b8;border-radius:var(--radius);background:rgba(255,255,255,.40);pointer-events:none}.reordering{user-select:none;-webkit-user-select:none}
     .edit-note{display:none;margin:-6px 0 16px;color:#70798a;font-size:12px;font-weight:700}.edit-note.show{display:block}
     footer{color:#9aa1ad;text-align:center;font-size:12px;margin-top:30px}
-    @media(max-width:980px){.grid{grid-template-columns:1fr 1fr}}
-    @media(max-width:720px){.wrap{width:min(100% - 22px,1120px);padding-top:18px}header{margin-bottom:42px}.today{font-size:12px}.brand{font-size:17px}.brand-mark{width:38px;height:38px;border-radius:12px}.hero{margin-bottom:24px}h1{font-size:clamp(42px,13vw,60px)}.lead{font-size:17px}.layout-bar{margin-bottom:14px}.grid{grid-template-columns:1fr;gap:14px}.card{min-height:235px;padding:22px;border-radius:23px}.card-placeholder{min-height:235px;border-radius:23px}.card h2{font-size:28px}.move-handle{right:12px;top:12px}}
+    @media(max-width:980px){.recap-grid{grid-template-columns:1fr 1fr}.recap-card.lights-recap{grid-column:1/-1}.grid{grid-template-columns:1fr 1fr}}
+    @media(max-width:720px){.wrap{width:min(100% - 22px,1120px);padding-top:18px}header{margin-bottom:42px}.today{font-size:12px}.brand{font-size:17px}.brand-mark{width:38px;height:38px;border-radius:12px}.hero{margin-bottom:24px}h1{font-size:clamp(42px,13vw,60px)}.lead{font-size:17px}.recap-grid{grid-template-columns:1fr;gap:10px;margin-bottom:24px}.recap-card.lights-recap{grid-column:auto}.recap-card{padding:16px;border-radius:18px}.quick-lights{grid-template-columns:1fr 1fr}.layout-bar{margin-bottom:14px}.grid{grid-template-columns:1fr;gap:14px}.card{min-height:235px;padding:22px;border-radius:23px}.card-placeholder{min-height:235px;border-radius:23px}.card h2{font-size:28px}.move-handle{right:12px;top:12px}}
   </style>
 </head>
 <body>
   <main class="wrap">
     <header><div class="brand"><div class="brand-mark">H</div><span>Haneva</span></div><div class="today" id="today">Haneva Home</div></header>
     <section class="hero"><div class="eyebrow">🏠 Hanych + Eva</div><h1>Všechno naše<br>na jednom místě.</h1><p class="lead">Společný domov pro rozpočet, kalendář a další malé aplikace, které nám usnadní každodenní život.</p></section>
+    <section class="recap-grid" aria-label="Rychlý přehled">
+      <a class="recap-card" href="/rozpocet/" aria-label="Otevřít společný rozpočet">
+        <div class="recap-head"><span class="recap-kicker">Společný účet</span><span class="recap-link">Rozpočet →</span></div>
+        <div class="money-value" id="sharedRemaining">—</div>
+        <div class="recap-note" id="sharedRemainingNote">Načítám aktuální zůstatek…</div>
+      </a>
+      <a class="recap-card" href="/kalendar" aria-label="Otevřít dnešní kalendář">
+        <div class="recap-head"><span class="recap-kicker">Dnes</span><span class="recap-link">Kalendář →</span></div>
+        <div class="today-events" id="todayEvents"><div class="event-empty">Načítám dnešní akce…</div></div>
+      </a>
+      <div class="recap-card lights-recap">
+        <div class="recap-head"><span class="recap-kicker" id="quickLightsTitle">Rychlá světla</span><a class="recap-link" href="/domov">Domov →</a></div>
+        <div class="quick-lights" id="quickLights"><div class="event-empty">Načítám světla…</div></div>
+      </div>
+    </section>
     <div class="layout-bar"><div class="layout-owner" id="layoutOwner">Pořadí dlaždic se ukládá pro přihlášený účet.</div><button class="layout-edit" id="editLayout" type="button">Upravit pořadí</button></div>
     <div class="edit-note" id="editNote">Chyť dlaždici za symbol vpravo nahoře a přesuň ji. Pořadí se uloží automaticky.</div>
     <section class="grid" id="appGrid" aria-label="Aplikace Haneva">
@@ -48,8 +70,10 @@
   </main>
   <script>
     const grid=document.getElementById('appGrid'),editBtn=document.getElementById('editLayout'),editNote=document.getElementById('editNote'),owner=document.getElementById('layoutOwner');
+    const sharedRemainingEl=document.getElementById('sharedRemaining'),sharedRemainingNote=document.getElementById('sharedRemainingNote'),todayEventsEl=document.getElementById('todayEvents'),quickLightsEl=document.getElementById('quickLights'),quickLightsTitle=document.getElementById('quickLightsTitle');
     const defaultOrder=['budget','calendar','shopping','home-control'];
-    let editing=false,tileDrag=null,session={access_detected:false,person:'',email:'',home_layout:[...defaultOrder]};
+    let editing=false,tileDrag=null,session={access_detected:false,person:'',email:'',home_layout:[...defaultOrder],light_usage:[]};
+    let homeEntities=[];
 
     const now=new Date(),today=document.getElementById('today'),dateText=new Intl.DateTimeFormat('cs-CZ',{weekday:'long',day:'numeric',month:'long'}).format(now);
     today.textContent=dateText.charAt(0).toUpperCase()+dateText.slice(1);
@@ -65,6 +89,175 @@
     function fallbackKey(){return 'haneva-home-layout-local'}
     function loadLocal(){try{return normalizedOrder(JSON.parse(localStorage.getItem(fallbackKey())||'[]'))}catch(_){return [...defaultOrder]}}
     function saveLocal(order){try{localStorage.setItem(fallbackKey(),JSON.stringify(order))}catch(_){}}
+
+    function localISODate(d=new Date()){
+      const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+      return y+'-'+m+'-'+day;
+    }
+    function formatMoney(value){
+      return new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:0}).format(value);
+    }
+    function finiteNumber(value){
+      if(typeof value==='number'&&Number.isFinite(value))return value;
+      if(typeof value==='string'){
+        const cleaned=value.replace(/\s/g,'').replace(',', '.').replace(/[^0-9.+-]/g,'');
+        const parsed=Number(cleaned);
+        return Number.isFinite(parsed)?parsed:null;
+      }
+      return null;
+    }
+    function normalizeKey(value){
+      return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
+    }
+    function readPath(obj,path){
+      let value=obj;
+      for(const key of path){if(!value||typeof value!=='object'||!(key in value))return null;value=value[key]}
+      return finiteNumber(value);
+    }
+    function sharedRemainingFrom(data){
+      const direct=[
+        ['shared','remaining'],['shared','balance'],['shared','available'],['shared','left'],
+        ['shared','currentBalance'],['shared','current_balance'],['sharedRemaining'],['sharedBalance'],
+        ['shared_remaining'],['shared_balance'],['spolecne','zbyva'],['spolecne','zustatek'],
+        ['spolecneZbyva'],['spolecneZustatek'],['summary','sharedRemaining'],['summary','sharedBalance']
+      ];
+      for(const path of direct){const value=readPath(data,path);if(value!==null)return value}
+      const candidates=[];
+      function walk(value,path=[],depth=0){
+        if(depth>6||value===null||value===undefined)return;
+        if(typeof value==='number'||typeof value==='string'){
+          const num=finiteNumber(value);if(num===null)return;
+          const key=normalizeKey(path.join('.'));
+          let score=0;
+          if(/shared|spolec/.test(key))score+=10;
+          if(/remaining|balance|available|left|zby|zustatek/.test(key))score+=12;
+          if(/account|ucet/.test(key))score+=3;
+          if(/expense|spent|cost|vydaj|naklad/.test(key))score-=9;
+          if(/income|prijem|deposit|vklad|platba/.test(key))score-=6;
+          if(score>=15)candidates.push({score,value:num,path:key});
+          return;
+        }
+        if(Array.isArray(value)){value.slice(0,50).forEach((item,i)=>walk(item,path.concat(String(i)),depth+1));return}
+        if(typeof value==='object')Object.entries(value).forEach(([key,item])=>walk(item,path.concat(key),depth+1));
+      }
+      walk(data);
+      candidates.sort((a,b)=>b.score-a.score);
+      return candidates.length?candidates[0].value:null;
+    }
+    async function loadSharedRemaining(){
+      try{
+        const r=await fetch('/rozpocet/api/dashboard',{cache:'no-store'}),data=await r.json();
+        if(!r.ok)throw new Error();
+        const value=sharedRemainingFrom(data);
+        if(value===null)throw new Error();
+        sharedRemainingEl.textContent=formatMoney(value);
+        sharedRemainingEl.classList.toggle('negative',value<0);
+        sharedRemainingNote.textContent='Společně zbývá na účtu';
+      }catch(_){
+        sharedRemainingEl.textContent='—';
+        sharedRemainingNote.textContent='Zůstatek se teď nepodařilo načíst';
+      }
+    }
+    function eventSortValue(event){
+      if(event.all_day)return '00:00';
+      return String(event.start_time||'99:99').slice(0,5);
+    }
+    async function loadTodayEvents(){
+      const day=localISODate();
+      try{
+        const r=await fetch('/api/events?start='+encodeURIComponent(day)+'&end='+encodeURIComponent(day),{cache:'no-store'}),data=await r.json();
+        if(!r.ok)throw new Error();
+        const events=(Array.isArray(data.events)?data.events:[])
+          .filter(event=>event.calendar!=='svatky'&&event.system_kind!=='holiday')
+          .sort((a,b)=>eventSortValue(a).localeCompare(eventSortValue(b),'cs'));
+        todayEventsEl.replaceChildren();
+        if(!events.length){
+          const empty=document.createElement('div');empty.className='event-empty';empty.textContent='Dnes nic naplánovaného.';
+          todayEventsEl.appendChild(empty);return;
+        }
+        events.slice(0,4).forEach(event=>{
+          const row=document.createElement('div');row.className='today-event';
+          const time=document.createElement('div');time.className='event-time';time.textContent=event.all_day?'Celý den':String(event.start_time||'').slice(0,5)||'—';
+          const title=document.createElement('div');title.className='event-title';title.textContent=event.title||'Událost';
+          row.append(time,title);todayEventsEl.appendChild(row);
+        });
+        if(events.length>4){
+          const more=document.createElement('div');more.className='recap-note';more.textContent='+'+(events.length-4)+' další';
+          todayEventsEl.appendChild(more);
+        }
+      }catch(_){
+        todayEventsEl.innerHTML='<div class="event-empty">Kalendář se teď nepodařilo načíst.</div>';
+      }
+    }
+    function isLightLike(entity){
+      const name=normalizeKey(entity?.name||'');
+      return entity?.domain==='light'||(entity?.domain==='switch'&&(entity?.icon==='💡'||/svetlo|light/.test(name)));
+    }
+    function usageMap(){
+      const map=new Map();
+      (Array.isArray(session.light_usage)?session.light_usage:[]).forEach(item=>map.set(item.entity_id,Number(item.use_count)||0));
+      return map;
+    }
+    function bumpLocalUsage(entityId){
+      if(!session.access_detected)return;
+      if(!Array.isArray(session.light_usage))session.light_usage=[];
+      let item=session.light_usage.find(row=>row.entity_id===entityId);
+      if(item)item.use_count=(Number(item.use_count)||0)+1;
+      else session.light_usage.push({entity_id:entityId,use_count:1});
+    }
+    function renderQuickLights(){
+      const usage=usageMap();
+      const ranked=homeEntities.map((entity,index)=>({entity,index}))
+        .filter(row=>isLightLike(row.entity))
+        .sort((a,b)=>(usage.get(b.entity.entity_id)||0)-(usage.get(a.entity.entity_id)||0)||a.index-b.index)
+        .slice(0,4).map(row=>row.entity);
+      quickLightsTitle.textContent=session.person==='hanych'?'Hanychova rychlá světla':session.person==='eva'?'Evina rychlá světla':'Rychlá světla';
+      quickLightsEl.replaceChildren();
+      if(!ranked.length){
+        const empty=document.createElement('div');empty.className='event-empty';empty.textContent='Žádná světla nejsou nastavená.';
+        quickLightsEl.appendChild(empty);return;
+      }
+      ranked.forEach(entity=>{
+        const btn=document.createElement('button');btn.type='button';btn.className='quick-light'+(entity.is_on?' on':'')+(entity.available===false?' unavailable':'');
+        btn.disabled=entity.available===false;btn.dataset.entityId=entity.entity_id;btn.setAttribute('aria-pressed',entity.is_on?'true':'false');
+        const icon=document.createElement('span');icon.className='quick-light-icon';icon.textContent=entity.icon||'💡';
+        const copy=document.createElement('span');copy.className='quick-light-copy';
+        const name=document.createElement('span');name.className='quick-light-name';name.textContent=entity.name||entity.entity_id;
+        const state=document.createElement('span');state.className='quick-light-state';state.textContent=entity.available===false?'Nedostupné':entity.is_on?'Zapnuto':'Vypnuto';
+        const dot=document.createElement('span');dot.className='quick-light-dot';
+        copy.append(name,state);btn.append(icon,copy,dot);
+        btn.addEventListener('click',()=>toggleQuickLight(entity,btn));
+        quickLightsEl.appendChild(btn);
+      });
+    }
+    async function toggleQuickLight(entity,button){
+      if(button.disabled)return;
+      button.disabled=true;
+      try{
+        const r=await fetch('/api/domov/entity',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({entity_id:entity.entity_id,turn_on:!entity.is_on})});
+        const data=await r.json();if(!r.ok||!data.entity)throw new Error();
+        const index=homeEntities.findIndex(item=>item.entity_id===entity.entity_id);
+        if(index>=0)homeEntities[index]=data.entity;
+        bumpLocalUsage(entity.entity_id);
+        renderQuickLights();
+      }catch(_){
+        button.disabled=false;
+        button.querySelector('.quick-light-state').textContent='Nepodařilo se';
+      }
+    }
+    async function loadQuickLights(){
+      try{
+        const r=await fetch('/api/domov',{cache:'no-store'}),data=await r.json();
+        if(!r.ok)throw new Error();
+        homeEntities=Array.isArray(data.entities)?data.entities:[];
+        renderQuickLights();
+      }catch(_){
+        quickLightsEl.innerHTML='<div class="event-empty">Domácnost se teď nepodařilo načíst.</div>';
+      }
+    }
+    async function loadRecap(){
+      await Promise.all([loadSharedRemaining(),loadTodayEvents(),loadQuickLights()]);
+    }
 
     async function loadSession(){
       try{
@@ -131,7 +324,7 @@
       card.addEventListener('click',e=>{if(editing)e.preventDefault()});
       card.querySelector('.move-handle').addEventListener('pointerdown',startTileDrag);
     });
-    loadSession();
+    (async()=>{await loadSession();await loadRecap()})();
   </script>
 </body>
 </html>
