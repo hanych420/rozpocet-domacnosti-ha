@@ -115,34 +115,7 @@
       return finiteNumber(value);
     }
     function sharedRemainingFrom(data){
-      const direct=[
-        ['shared','remaining'],['shared','balance'],['shared','available'],['shared','left'],
-        ['shared','currentBalance'],['shared','current_balance'],['sharedRemaining'],['sharedBalance'],
-        ['shared_remaining'],['shared_balance'],['spolecne','zbyva'],['spolecne','zustatek'],
-        ['spolecneZbyva'],['spolecneZustatek'],['summary','sharedRemaining'],['summary','sharedBalance']
-      ];
-      for(const path of direct){const value=readPath(data,path);if(value!==null)return value}
-      const candidates=[];
-      function walk(value,path=[],depth=0){
-        if(depth>6||value===null||value===undefined)return;
-        if(typeof value==='number'||typeof value==='string'){
-          const num=finiteNumber(value);if(num===null)return;
-          const key=normalizeKey(path.join('.'));
-          let score=0;
-          if(/shared|spolec/.test(key))score+=10;
-          if(/remaining|balance|available|left|zby|zustatek/.test(key))score+=12;
-          if(/account|ucet/.test(key))score+=3;
-          if(/expense|spent|cost|vydaj|naklad/.test(key))score-=9;
-          if(/income|prijem|deposit|vklad|platba/.test(key))score-=6;
-          if(score>=15)candidates.push({score,value:num,path:key});
-          return;
-        }
-        if(Array.isArray(value)){value.slice(0,50).forEach((item,i)=>walk(item,path.concat(String(i)),depth+1));return}
-        if(typeof value==='object')Object.entries(value).forEach(([key,item])=>walk(item,path.concat(key),depth+1));
-      }
-      walk(data);
-      candidates.sort((a,b)=>b.score-a.score);
-      return candidates.length?candidates[0].value:null;
+      return readPath(data,['shared','joint','balance']);
     }
     async function loadSharedRemaining(){
       try{
