@@ -126,6 +126,15 @@ def init_profile_db():
                 updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
             )'''
         )
+        conn.execute(
+            '''CREATE TABLE IF NOT EXISTS light_usage (
+                email TEXT NOT NULL,
+                entity_id TEXT NOT NULL,
+                use_count INTEGER NOT NULL DEFAULT 0,
+                last_used_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY(email, entity_id)
+            )'''
+        )
         columns = {row[1] for row in conn.execute("PRAGMA table_info(profiles)").fetchall()}
         if "home_layout" not in columns:
             conn.execute("ALTER TABLE profiles ADD COLUMN home_layout TEXT NOT NULL DEFAULT ''")
@@ -203,6 +212,42 @@ def read_profile(email):
     }
 
 
+def read_light_usage(email, limit=50):
+    email = normalize_email(email)
+    if not email:
+        return []
+    init_profile_db()
+    with sqlite3.connect(PROFILE_DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            """SELECT entity_id, use_count, last_used_at
+               FROM light_usage
+               WHERE email=?
+               ORDER BY use_count DESC, last_used_at DESC
+               LIMIT ?""",
+            (email, max(1, min(int(limit or 50), 100))),
+        ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def record_light_usage(email, entity_id):
+    email = normalize_email(email)
+    entity_id = str(entity_id or "").strip().lower()
+    if not email or not entity_id or "." not in entity_id:
+        return
+    init_profile_db()
+    with sqlite3.connect(PROFILE_DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO light_usage(email, entity_id, use_count, last_used_at)
+               VALUES(?, ?, 1, CURRENT_TIMESTAMP)
+               ON CONFLICT(email, entity_id) DO UPDATE SET
+                 use_count=light_usage.use_count + 1,
+                 last_used_at=CURRENT_TIMESTAMP""",
+            (email, entity_id),
+        )
+        conn.commit()
+
+
 def save_person(email, person):
     if person not in PERSONS:
         raise ValueError("Vyber Hanych nebo Eva.")
@@ -275,6 +320,7 @@ def session_payload(email):
         "default_calendar": default_calendar,
         "home_layout": profile.get("home_layout") or list(HOME_TILES),
         "smart_room_order": profile.get("smart_room_order") or [],
+        "light_usage": read_light_usage(email),
     }
 
 
