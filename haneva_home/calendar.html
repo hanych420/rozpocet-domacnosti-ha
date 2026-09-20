@@ -30,13 +30,13 @@
     .primary{border:0;border-radius:15px;background:#111827;color:#fff;padding:13px 18px;font-weight:800;box-shadow:0 10px 24px rgba(17,24,39,.16);display:inline-flex;align-items:center;gap:8px}
 
     .panel{background:var(--surface);border:1px solid rgba(255,255,255,.9);border-radius:var(--radius);box-shadow:var(--shadow);backdrop-filter:blur(16px);overflow:hidden}
-    .toolbar{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-    .nav{display:flex;align-items:center;gap:9px}
+    .toolbar{display:flex;flex-direction:column;align-items:stretch;justify-content:space-between;gap:14px;padding:18px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+    .nav{display:flex;align-items:center;justify-content:center;gap:9px}
     .nav button,.view-toggle button{border:1px solid var(--line);background:#fff;color:#3d4656;border-radius:12px;padding:9px 12px;font-weight:750}
     .nav .icon-btn{width:40px;padding:9px 0}
     .month-title{min-width:180px;text-align:center;font-size:20px;font-weight:850;letter-spacing:-.02em}
     .view-toggle{display:flex;gap:5px;background:#f3f4f6;padding:4px;border-radius:13px}
-    .view-toggle button{border:0;background:transparent}
+    .view-toggle button{flex:1;border:0;background:transparent}
     .view-toggle button.active{background:#fff;color:#111827;box-shadow:0 2px 8px rgba(31,41,55,.08)}
 
     .filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line);background:rgba(249,250,251,.65)}
@@ -103,9 +103,6 @@
     .checkline{display:flex;align-items:center;gap:8px;padding-top:5px}.checkline input{width:17px;height:17px}
     .ticket-field{border:1px solid #e6e1ff;border-radius:15px;padding:13px;background:#faf9ff;gap:10px}
     .ticket-field[hidden]{display:none}
-    .ticket-people{display:flex;flex-direction:column;gap:9px}
-    .ticket-person{border:1px solid #e6e1ff;border-radius:13px;padding:11px;background:#fff}
-    .ticket-person-name{font-size:13px;font-weight:900;color:#453a65;margin-bottom:8px}
     .ticket-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
     .ticket-picker input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
     .ticket-pick{display:inline-flex;align-items:center;justify-content:center;border:1px solid #dcd5ff;background:#fff;color:#51467c;border-radius:11px;padding:9px 12px;font-size:13px;font-weight:800;cursor:pointer}
@@ -114,13 +111,22 @@
     .ticket-actions[hidden],.ticket-qr[hidden],.ticket-no-qr[hidden]{display:none}
     .ticket-actions button,.ticket-actions a{border:1px solid #e4e0f4;background:#fff;color:#51467c;border-radius:10px;padding:8px 10px;font-size:12px;font-weight:800;text-decoration:none}
     .ticket-help{margin:0;color:#8b8498;font-size:11px;line-height:1.4}
-    #ticketDialog{width:min(520px,calc(100% - 24px))}
-    .ticket-viewer{padding:20px;text-align:center}
-    .ticket-viewer .modal-head{text-align:left}
-    .ticket-qr{display:block;width:min(100%,380px);max-height:62vh;object-fit:contain;margin:0 auto 14px;border-radius:18px;background:#fff;border:1px solid var(--line)}
-    .ticket-no-qr{padding:34px 18px;margin-bottom:14px;border-radius:16px;background:#f7f5ff;color:#655c78;line-height:1.5}
+    #ticketDialog{width:100vw;height:100dvh;max-width:none;max-height:none;margin:0;inset:0;border-radius:0;background:#fff;color:#111;overflow:auto;overscroll-behavior:contain}
+    #ticketDialog::backdrop{background:#fff}
+    .ticket-viewer{min-height:100%;padding:calc(16px + env(safe-area-inset-top)) 20px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;align-items:center;gap:12px;background:#fff}
+    .ticket-viewer .modal-head{width:100%;max-width:600px;margin:0}
+    .ticket-stage{width:100%;flex:1;display:grid;place-items:center;touch-action:pan-y;min-height:150px}
+    .ticket-qr{display:block;width:min(86vw,440px,52dvh);height:auto;object-fit:contain;background:#fff}
+    .ticket-no-qr{padding:30px 12px;max-width:440px;text-align:center;line-height:1.5}
+    .ticket-pager{display:flex;align-items:center;justify-content:center;gap:20px}
+    .ticket-pager[hidden]{display:none}
+    .ticket-pager button{min-width:48px;min-height:44px;border:1px solid var(--line);border-radius:12px;background:#fff}
     .ticket-viewer-actions{display:flex;justify-content:center;gap:9px;flex-wrap:wrap}
     .ticket-viewer-actions a{display:inline-flex;text-decoration:none}
+    .ticket-viewer-note{margin:0;text-align:center;font-size:12px;color:#555;max-width:440px}
+    .ticket-error{margin:0;color:#b91c1c;font-size:13px;overflow-wrap:anywhere}
+    .ticket-error:empty{display:none}
+    button:disabled{cursor:wait;opacity:.5}
     .actions{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:22px}
     .actions-right{display:flex;gap:9px;margin-left:auto}
     .secondary,.danger{border:1px solid var(--line);background:#fff;color:#4b5563;border-radius:12px;padding:10px 14px;font-weight:800}
@@ -174,8 +180,8 @@
 
     <section class="panel">
       <div class="toolbar">
-        <div class="nav"><button class="icon-btn" id="prevMonth">←</button><button id="todayButton">Dnes</button><div class="month-title" id="monthTitle"></div><button class="icon-btn" id="nextMonth">→</button></div>
         <div class="view-toggle"><button class="month-button" data-view="month">Měsíc</button><button class="agenda-button" data-view="agenda">Agenda</button></div>
+        <div class="nav"><button class="icon-btn" id="prevMonth">←</button><button id="todayButton">Dnes</button><div class="month-title" id="monthTitle"></div><button class="icon-btn" id="nextMonth">→</button></div>
       </div>
       <div class="filters" id="filters">
         <button class="filter active" data-calendar="hanych"><span class="filter-dot hanych"></span>Hanych<span class="filter-check">✓</span></button>
@@ -210,20 +216,13 @@
       <div class="field full"><label for="location">Místo</label><input id="location" maxlength="250" placeholder="Volitelné"></div>
       <div class="field full"><label for="notes">Poznámka</label><textarea id="notes" maxlength="2000" placeholder="Volitelné"></textarea></div>
       <div class="field full ticket-field" id="ticketField" hidden>
-        <label>Vstupenky</label>
-        <div class="ticket-people" id="ticketPeople">
-          <section class="ticket-person" data-ticket-owner="hanych">
-            <div class="ticket-person-name">Hanych</div>
-            <div class="ticket-picker"><label class="ticket-pick" for="ticketFileHanych">＋ Nahrát Hanychovu</label><input id="ticketFileHanych" data-ticket-file="hanych" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><span class="ticket-status" data-ticket-status="hanych">PDF nebo obrázek, maximálně 15 MB</span></div>
-            <div class="ticket-actions" data-ticket-actions="hanych" hidden><button type="button" data-show-ticket="hanych">🎟️ Zobrazit QR</button><a data-original-ticket="hanych" target="_blank" rel="noopener">Původní PDF</a><button type="button" data-remove-ticket="hanych">Odstranit</button></div>
-          </section>
-          <section class="ticket-person" data-ticket-owner="eva">
-            <div class="ticket-person-name">Eva</div>
-            <div class="ticket-picker"><label class="ticket-pick" for="ticketFileEva">＋ Nahrát Evinu</label><input id="ticketFileEva" data-ticket-file="eva" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"><span class="ticket-status" data-ticket-status="eva">PDF nebo obrázek, maximálně 15 MB</span></div>
-            <div class="ticket-actions" data-ticket-actions="eva" hidden><button type="button" data-show-ticket="eva">🎟️ Zobrazit QR</button><a data-original-ticket="eva" target="_blank" rel="noopener">Původní PDF</a><button type="button" data-remove-ticket="eva">Odstranit</button></div>
-          </section>
-        </div>
-        <p class="ticket-help">Oba uvidíte obě vstupenky. Haneva z každého souboru vyřízne jeho vlastní QR a přihlášenému uživateli dá jeho vstupenku jako první.</p>
+        <label for="ticketFile">Soubor se vstupenkami</label>
+        <div class="ticket-picker"><button class="ticket-pick" id="pickTicket" type="button">＋ Nahrát soubor</button><input id="ticketFile" type="file" accept="application/pdf,image/jpeg,image/png,image/webp"></div>
+        <span class="ticket-status" id="ticketStatus" role="status">PDF nebo obrázek, maximálně 15 MB</span>
+        <div class="ticket-actions" id="ticketActions" hidden><button type="button" id="showTicket">Zobrazit vstupenku</button><button type="button" id="removeTickets">Odstranit vstupenky</button></div>
+        <p class="ticket-help">Nahraj jedno PDF nebo obrázek. Haneva z něj automaticky vybere všechny čitelné QR kódy.</p>
+        <p class="ticket-help">Jeden QR bez jména, více QR očíslovaných. Stejný QR opakovaný v souboru se zobrazí jen jednou.</p>
+        <p class="ticket-error" id="ticketError" role="alert"></p>
       </div>
     </div>
     <div class="actions"><button class="danger" type="button" id="deleteEvent">Smazat</button><div class="actions-right"><button class="secondary" type="button" id="cancelDialog">Zrušit</button><button class="save" type="submit">Uložit</button></div></div>
@@ -232,9 +231,16 @@
   <dialog id="ticketDialog">
     <div class="ticket-viewer">
       <div class="modal-head"><h2 id="ticketViewerTitle">Vstupenka</h2><button class="close" type="button" id="closeTicket" aria-label="Zavřít">×</button></div>
-      <img class="ticket-qr" id="ticketQr" alt="QR kód vstupenky" hidden>
-      <div class="ticket-no-qr" id="ticketNoQr" hidden>QR kód se nepodařilo samostatně vyříznout. Otevři původní vstupenku.</div>
-      <div class="ticket-viewer-actions"><a class="save" id="ticketOriginalViewer" target="_blank" rel="noopener">Otevřít původní soubor</a></div>
+      <div class="ticket-stage" id="ticketStage">
+        <img class="ticket-qr" id="ticketQr" alt="QR kód vstupenky" hidden>
+        <div class="ticket-no-qr" id="ticketNoQr" role="status" hidden></div>
+      </div>
+      <div class="ticket-pager"><button type="button" id="ticketPrev" aria-label="Předchozí vstupenka">←</button><span id="ticketPage" aria-live="polite"></span><button type="button" id="ticketNext" aria-label="Další vstupenka">→</button></div>
+      <p class="ticket-viewer-note" id="ticketSwipeHint">Přejeď prstem do strany pro další vstupenku.</p>
+      <div class="ticket-viewer-actions"><a class="secondary" id="ticketOriginalViewer" target="_blank" rel="noopener">Původní soubor</a></div>
+      <p class="ticket-viewer-note">Pro načtení u vstupu nastav jas telefonu na maximum.</p>
+      <p class="ticket-viewer-note" id="ticketWakeStatus"></p>
+      <p class="ticket-error" id="ticketViewerError" role="alert"></p>
     </div>
   </dialog>
 
@@ -270,9 +276,10 @@
       suppressClickUntil:0,
       colors:{...defaultColors},
       expandedDays:new Set(),
-      tickets:{hanych:null,eva:null},
-      ticketFiles:{hanych:null,eva:null},
-      removeTickets:new Set()
+      tickets:[],
+      ticketFile:null,
+      removeTicketBundle:false,
+      saving:false
     };
     const mouseGesture={kind:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
     const touchGesture={kind:null,timer:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
@@ -613,44 +620,77 @@
       document.querySelectorAll('.time-field').forEach(el=>el.style.opacity=disabled?'.45':'1');
     }
 
+    function setTickets(tickets){
+      state.tickets=Array.isArray(tickets)?tickets:[];
+    }
+
+    function resetTicketChanges(){
+      state.ticketFile=null;state.removeTicketBundle=false;
+      $('ticketFile').value='';$('ticketError').textContent='';
+    }
+
     function syncTicketField(){
-      const entertainment=$('eventType').value==='zabava';
-      $('ticketField').hidden=!entertainment;
-      if(!entertainment){
-        state.ticketFiles={hanych:null,eva:null};
-        document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
-        return;
-      }
-      const person=(typeof sessionState!=='undefined'&&['hanych','eva'].includes(sessionState.person))?sessionState.person:'';
-      const order=person?[person,person==='hanych'?'eva':'hanych']:['hanych','eva'];
-      const people=$('ticketPeople');
-      order.forEach(owner=>people.appendChild(document.querySelector(`[data-ticket-owner="${owner}"]`)));
-      order.forEach(owner=>{
-        const selected=state.ticketFiles[owner];
-        const current=state.removeTickets.has(owner)?null:state.tickets[owner];
-        const status=document.querySelector(`[data-ticket-status="${owner}"]`);
-        if(selected)status.textContent=`Připraveno: ${selected.name}`;
-        else if(current)status.textContent=current.qr_url?`${current.name} · QR nalezen`:`${current.name} · bez samostatného QR`;
-        else status.textContent='PDF nebo obrázek, maximálně 15 MB';
-        document.querySelector(`[data-ticket-actions="${owner}"]`).hidden=!current;
-        if(current)document.querySelector(`[data-original-ticket="${owner}"]`).href=current.original_url;
-      });
+      $('ticketField').hidden=$('eventType').value!=='zabava';
+      const current=state.tickets;
+      $('ticketActions').hidden=!current.length||state.removeTicketBundle;
+      $('ticketStatus').textContent=state.ticketFile?'Připraveno: '+state.ticketFile.name:
+        state.removeTicketBundle?'Vstupenky se odstraní po uložení.':
+        current.length?'Uloženo: '+current.length+' QR':'PDF nebo obrázek, maximálně 15 MB';
     }
 
-    function showTicket(owner){
-      const ticket=state.tickets[owner];
-      if(!ticket)return;
-      $('ticketViewerTitle').textContent=`Vstupenka · ${ticket.owner_label}`;
-      $('ticketQr').hidden=!ticket.qr_url;
-      $('ticketNoQr').hidden=!!ticket.qr_url;
-      if(ticket.qr_url)$('ticketQr').src=`${ticket.qr_url}?v=${Date.now()}`;
+    let ticketSlides=[],ticketIndex=0,ticketImageVersion=0,ticketWakeLock=null,wakePending=false;
+    function renderTicketSlide(){
+      const ticket=ticketSlides[ticketIndex];if(!ticket)return;
+      const label=ticketSlides.length===1?'Vstupenka':'Vstupenka '+(ticketIndex+1);
+      $('ticketViewerTitle').textContent=label;
+      $('ticketPage').textContent=(ticketIndex+1)+' / '+ticketSlides.length;
+      $('ticketPrev').disabled=ticketSlides.length<2;
+      $('ticketNext').disabled=ticketSlides.length<2;
+      document.querySelector('.ticket-pager').hidden=ticketSlides.length<2;
+      $('ticketSwipeHint').hidden=ticketSlides.length<2;
+      const qr=$('ticketQr'),status=$('ticketNoQr'),version=++ticketImageVersion;
+      // Never leave the preceding QR visible while a new image loads.
+      qr.hidden=true;qr.removeAttribute('src');status.hidden=false;
+      status.textContent=ticket.qr_url?'Načítám QR…':'QR není dostupný. Otevři původní soubor.';
+      qr.onload=()=>{if(version!==ticketImageVersion)return;qr.hidden=false;status.hidden=true};
+      qr.onerror=()=>{if(version!==ticketImageVersion)return;qr.hidden=true;status.hidden=false;status.textContent='QR se nepodařilo načíst. Otevři původní soubor.'};
+      qr.alt='QR · '+label;
+      if(ticket.qr_url)qr.src=ticket.qr_url+'?v='+Date.now();
       $('ticketOriginalViewer').href=ticket.original_url;
-      $('ticketDialog').showModal();
     }
 
-    function closeTicket(){
-      $('ticketDialog').close();
-      $('ticketQr').removeAttribute('src');
+    async function keepTicketAwake(){
+      if(wakePending||ticketWakeLock||!$('ticketDialog').open||document.visibilityState!=='visible')return;
+      if(!navigator.wakeLock){$('ticketWakeStatus').textContent='Pokud displej zhasíná, prodluž jeho automatické zamykání.';return}
+      wakePending=true;
+      try{
+        const lock=await navigator.wakeLock.request('screen');
+        if(!$('ticketDialog').open){await lock.release();return}
+        ticketWakeLock=lock;$('ticketWakeStatus').textContent='Displej během zobrazení nezhasne.';
+        lock.addEventListener('release',()=>{
+          if(ticketWakeLock===lock)ticketWakeLock=null;
+          $('ticketWakeStatus').textContent='Zabránění zhasnutí displeje je neaktivní.';
+        });
+      }catch(_){$('ticketWakeStatus').textContent='Telefon nepovolil zabránit zhasnutí displeje.'}
+      finally{wakePending=false}
+    }
+
+    function showTicket(){
+      ticketSlides=[...state.tickets];
+      if(!ticketSlides.length)return;
+      ticketIndex=0;$('ticketViewerError').textContent='';
+      renderTicketSlide();$('ticketDialog').showModal();keepTicketAwake();
+    }
+
+    function turnTicket(direction){
+      if(ticketSlides.length<2)return;
+      ticketIndex=(ticketIndex+direction+ticketSlides.length)%ticketSlides.length;renderTicketSlide();
+    }
+
+    function closeTicket(){$('ticketDialog').close()}
+    function releaseTicketViewer(){
+      ticketImageVersion++;$('ticketQr').hidden=true;$('ticketQr').removeAttribute('src');
+      const lock=ticketWakeLock;ticketWakeLock=null;if(lock)lock.release().catch(()=>{});
     }
 
     function resetForm(){
@@ -662,11 +702,9 @@
       state.editingId=null;
       state.autoBirthdayRecurrence=false;
       state.autoKumiTitle=false;
-      state.tickets={hanych:null,eva:null};
-      state.ticketFiles={hanych:null,eva:null};
-      state.removeTickets=new Set();
+      state.tickets=[];
+      resetTicketChanges();
       $('eventType').value='';
-      document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
       syncTimeFields();
       syncTicketField();
     }
@@ -700,21 +738,25 @@
       $('endTime').value=e.end_time||'';
       $('location').value=e.location||'';
       $('notes').value=e.notes||'';
-      state.tickets={hanych:null,eva:null};
-      (e.tickets||[]).forEach(ticket=>state.tickets[ticket.owner]=ticket);
-      state.ticketFiles={hanych:null,eva:null};
-      state.removeTickets=new Set();
-      document.querySelectorAll('[data-ticket-file]').forEach(input=>input.value='');
+      setTickets(e.tickets);
+      resetTicketChanges();
       $('deleteEvent').style.display='inline-block';
       syncTimeFields();
       syncTicketField();
       $('eventDialog').showModal();
     }
 
-    function closeDialog(){$('eventDialog').close()}
+    function closeDialog(){if(!state.saving)$('eventDialog').close()}
 
     async function saveEvent(ev){
       ev.preventDefault();
+      if(state.saving)return;
+      state.saving=true;
+      const saveButton=$('eventForm').querySelector('button[type="submit"]');
+      saveButton.textContent='Ukládám…';
+      $('eventForm').querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=true);
+      $('ticketError').textContent='';
+      try{
       const payload={
         title:$('title').value.trim(),
         calendar:$('calendar').value,
@@ -736,30 +778,32 @@
       const edited=!!state.editingId;
       const eventId=data.event.id;
       state.editingId=eventId;
-      for(const owner of ['hanych','eva']){
-        if(state.removeTickets.has(owner)&&state.tickets[owner]){
-          const ticketDelete=await fetch(`/api/events/${eventId}/tickets/${owner}`,{method:'DELETE'});
-          if(!ticketDelete.ok&&ticketDelete.status!==404){
-            const error=await ticketDelete.json();
-            toast(error.error||'Vstupenku se nepodařilo odstranit.');
-            return;
-          }
-        }
-        if(state.ticketFiles[owner]){
-          const file=state.ticketFiles[owner];
-          const upload=await fetch(`/api/events/${eventId}/tickets/${owner}`,{
-            method:'POST',
-            headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':encodeURIComponent(file.name)},
-            body:file
-          });
-          const uploaded=await upload.json();
-          if(!upload.ok){toast(uploaded.error||'Vstupenku se nepodařilo nahrát.');return}
-        }
+      if(state.removeTicketBundle){
+        const response=await fetch('/api/events/'+eventId+'/tickets',{method:'DELETE'});
+        if(!response.ok)throw new Error('Vstupenky se nepodařilo odstranit.');
+        setTickets([]);state.removeTicketBundle=false;
       }
-      closeDialog();
-      const changedTickets=Object.values(state.ticketFiles).some(Boolean)||state.removeTickets.size>0;
-      toast(changedTickets?(edited?'Událost a vstupenky upraveny.':'Událost a vstupenky přidány.'):(edited?'Událost upravena.':'Událost přidána.'));
+      if(state.ticketFile&&payload.event_type==='zabava'){
+        const file=state.ticketFile;
+        saveButton.textContent='Rozděluji QR…';
+        const upload=await fetch('/api/events/'+eventId+'/tickets',{
+          method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':encodeURIComponent(file.name)},body:file
+        });
+        const uploaded=await upload.json();
+        if(!upload.ok)throw new Error(uploaded.error||'Vstupenky se nepodařilo rozdělit.');
+        setTickets(uploaded.tickets);resetTicketChanges();
+      }
+      $('eventDialog').close();
+      toast(edited?'Událost uložena.':'Událost přidána.');
       await loadEvents();
+      }catch(error){
+        $('ticketError').textContent=(state.editingId?'Událost je uložená. ':'')+error.message;
+        toast(error.message);
+      }finally{
+        state.saving=false;saveButton.textContent='Uložit';
+        $('eventForm').querySelectorAll('input,select,textarea,button').forEach(el=>el.disabled=false);
+        syncTimeFields();syncTicketField();
+      }
     }
 
     async function deleteEvent(){
@@ -856,23 +900,49 @@
     });
 
     $('allDay').addEventListener('change',syncTimeFields);
-    $('eventType').addEventListener('change',syncTicketField);
-    document.querySelectorAll('[data-ticket-file]').forEach(input=>input.addEventListener('change',()=>{
-      const owner=input.dataset.ticketFile,file=input.files[0]||null;
-      if(file&&file.size>15*1024*1024){toast('Vstupenka může mít nejvýše 15 MB.');input.value='';return}
-      state.ticketFiles[owner]=file;
-      state.removeTickets.delete(owner);
+    $('eventType').addEventListener('change',()=>{
+      if($('eventType').value!=='zabava'&&state.tickets.length>0){
+        if(!confirm('Změnou na běžnou událost se při uložení odstraní vstupenky. Pokračovat?')){$('eventType').value='zabava';return}
+      }
+      if($('eventType').value!=='zabava'){state.ticketFile=null;$('ticketFile').value=''}
       syncTicketField();
-    }));
-    document.querySelectorAll('[data-show-ticket]').forEach(button=>button.addEventListener('click',()=>showTicket(button.dataset.showTicket)));
-    document.querySelectorAll('[data-remove-ticket]').forEach(button=>button.addEventListener('click',()=>{
-      const owner=button.dataset.removeTicket,label=owner==='hanych'?'Hanychovu':'Evinu';
-      if(!confirm(`Odstranit ${label} vstupenku z události?`))return;
-      state.removeTickets.add(owner);state.ticketFiles[owner]=null;
-      document.querySelector(`[data-ticket-file="${owner}"]`).value='';syncTicketField();
-    }));
+    });
+    $('pickTicket').addEventListener('click',()=>$('ticketFile').click());
+    $('ticketFile').addEventListener('change',()=>{
+      const file=$('ticketFile').files[0]||null;
+      state.ticketFile=null;$('ticketError').textContent='';
+      if(file&&file.size>15*1024*1024){
+        $('ticketError').textContent='Soubor může mít nejvýše 15 MB.';$('ticketFile').value='';
+      }else{state.ticketFile=file;state.removeTicketBundle=false}
+      syncTicketField();
+    });
+    $('showTicket').addEventListener('click',showTicket);
+    $('removeTickets').addEventListener('click',()=>{
+      if(!confirm('Odstranit všechny vstupenky při uložení události?'))return;
+      state.removeTicketBundle=true;state.ticketFile=null;$('ticketFile').value='';syncTicketField();
+    });
     $('closeTicket').addEventListener('click',closeTicket);
-    $('ticketDialog').addEventListener('click',e=>{if(e.target===$('ticketDialog'))closeTicket()});
+    $('ticketDialog').addEventListener('close',releaseTicketViewer);
+    $('ticketPrev').addEventListener('click',()=>turnTicket(-1));
+    $('ticketNext').addEventListener('click',()=>turnTicket(1));
+    $('ticketDialog').addEventListener('keydown',event=>{
+      if(event.key==='ArrowLeft'){event.preventDefault();turnTicket(-1)}
+      if(event.key==='ArrowRight'){event.preventDefault();turnTicket(1)}
+    });
+    let ticketTouch=null;
+    $('ticketStage').addEventListener('touchstart',event=>{
+      ticketTouch=event.touches.length===1?{x:event.touches[0].clientX,y:event.touches[0].clientY}:null;
+    },{passive:true});
+    $('ticketStage').addEventListener('touchend',event=>{
+      if(!ticketTouch||!event.changedTouches.length)return;
+      const touch=event.changedTouches[0],dx=touch.clientX-ticketTouch.x,dy=touch.clientY-ticketTouch.y;
+      ticketTouch=null;if(Math.abs(dx)>45&&Math.abs(dx)>Math.abs(dy)*1.4)turnTicket(dx<0?1:-1);
+    },{passive:true});
+    $('ticketStage').addEventListener('touchcancel',()=>{ticketTouch=null},{passive:true});
+    document.addEventListener('visibilitychange',()=>{
+      if(document.visibilityState==='visible'&&$('ticketDialog').open)keepTicketAwake();
+    });
+    $('eventDialog').addEventListener('cancel',event=>{if(state.saving)event.preventDefault()});
     $('eventForm').addEventListener('submit',saveEvent);
     $('deleteEvent').addEventListener('click',deleteEvent);
     $('closeDialog').addEventListener('click',closeDialog);

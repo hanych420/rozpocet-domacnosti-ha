@@ -10,7 +10,9 @@ import sqlite3
 import subprocess
 import tempfile
 import uuid
-import xml.etree.ElementTree as ET
+import shutil
+import sys
+import threading
 
 import shopping
 
@@ -40,7 +42,7 @@ TICKET_TYPES = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
-TICKET_OWNERS = {"hanych": "Hanych", "eva": "Eva"}
+TICKET_SCAN_LOCK = threading.Lock()
 
 
 def db():
@@ -187,7 +189,6 @@ def ticket_metadata(row):
     owner = row["owner"]
     return {
         "owner": owner,
-        "owner_label": TICKET_OWNERS.get(owner, owner),
         "name": row["original_name"],
         "mime_type": row["mime_type"],
         "size": row["size"],
@@ -204,7 +205,7 @@ def get_ticket(event_id, owner):
 def get_tickets(event_id):
     with db() as conn:
         return conn.execute(
-            "SELECT * FROM event_tickets WHERE event_id=? ORDER BY CASE owner WHEN 'hanych' THEN 0 ELSE 1 END",
+            "SELECT * FROM event_tickets WHERE event_id=? ORDER BY CASE owner WHEN 'hanych' THEN 0 WHEN 'eva' THEN 1 ELSE CAST(owner AS INTEGER) END",
             (event_id,),
         ).fetchall()
 
@@ -221,6 +222,12 @@ def remove_ticket_files(row):
     if not row:
         return
     for key in ("stored_name", "qr_name"):
+        # Shared original PDF must survive deletion of just one legacy slot.
+        if row[key]:
+            with db() as conn:
+                if conn.execute("SELECT 1 FROM event_tickets WHERE stored_name=? OR qr_name=?",
+                                (row[key], row[key])).fetchone():
+                    continue
         path = safe_ticket_path(row[key])
         if path:
             try:
@@ -241,124 +248,81 @@ def detect_ticket_type(body):
     raise ValueError("Nahraj PDF nebo obrázek JPG, PNG či WebP.")
 
 
-def extract_qr(source_path, mime_type, qr_path):
-    """Najde QR v obrázku / prvních čtyřech stranách PDF a uloží jeho výřez."""
-    candidates = []
-    with tempfile.TemporaryDirectory(prefix="haneva-ticket-") as temp_dir:
-        if mime_type == "application/pdf":
-            prefix = str(Path(temp_dir) / "page")
-            try:
-                subprocess.run(
-                    ["pdftoppm", "-png", "-r", "220", "-f", "1", "-l", "4", str(source_path), prefix],
-                    check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=45,
-                )
-                candidates = sorted(Path(temp_dir).glob("page-*.png"))
-            except (OSError, subprocess.SubprocessError):
-                return ""
-        else:
-            candidates = [Path(source_path)]
-
-        for candidate in candidates:
-            try:
-                scan = subprocess.run(
-                    ["zbarimg", "--quiet", "--xml", str(candidate)],
-                    check=False, capture_output=True, timeout=20,
-                )
-            except (OSError, subprocess.SubprocessError):
-                return ""
-            if scan.returncode != 0 or not scan.stdout:
-                continue
-            try:
-                root = ET.fromstring(scan.stdout)
-                symbol = next((node for node in root.iter() if node.tag.endswith("symbol") and node.attrib.get("type") == "QR-Code"), None)
-                if symbol is None:
-                    continue
-                data_node = next((node for node in symbol.iter() if node.tag.endswith("data")), None)
-                qr_value = (data_node.text or "").strip() if data_node is not None else ""
-                if not qr_value:
-                    continue
-                points = [
-                    (int(node.attrib["x"]), int(node.attrib["y"]))
-                    for node in symbol.iter() if node.tag.endswith("point") and "x" in node.attrib and "y" in node.attrib
-                ]
-                if not points:
-                    continue
-                from PIL import Image
-                with Image.open(candidate) as image:
-                    left, right = min(x for x, _ in points), max(x for x, _ in points)
-                    top, bottom = min(y for _, y in points), max(y for _, y in points)
-                    padding = max(24, int(max(right - left, bottom - top) * .18))
-                    box = (max(0, left - padding), max(0, top - padding), min(image.width, right + padding), min(image.height, bottom + padding))
-                    crop = image.convert("RGB").crop(box)
-                    side = max(crop.size)
-                    canvas = Image.new("RGB", (side, side), "white")
-                    canvas.paste(crop, ((side - crop.width) // 2, (side - crop.height) // 2))
-                    if side < 900:
-                        canvas = canvas.resize((900, 900), Image.Resampling.NEAREST)
-                    canvas.save(qr_path, "PNG", optimize=True)
-                return qr_value
-            except (ET.ParseError, KeyError, ValueError, OSError, ImportError):
-                continue
-    return ""
-
-
-def save_ticket(event_id, owner, original_name, body):
-    if not body:
-        raise ValueError("Vyber soubor se vstupenkou.")
-    if len(body) > MAX_TICKET_SIZE:
-        raise ValueError("Vstupenka může mít nejvýše 15 MB.")
-    if owner not in TICKET_OWNERS:
-        raise ValueError("Vstupenka musí patřit Hanychovi nebo Evě.")
+def save_ticket_bundle(event_id, original_name, body):
+    if not body or len(body) > MAX_TICKET_SIZE:
+        raise ValueError("Vyber soubor o velikosti nejvýše 15 MB.")
     mime_type = detect_ticket_type(body)
     with db() as conn:
         event = conn.execute("SELECT event_type FROM events WHERE id=?", (event_id,)).fetchone()
     if not event:
         raise KeyError("Událost nebyla nalezena.")
     if event["event_type"] != "zabava":
-        raise ValueError("Vstupenku lze přidat jen k události typu Zábava.")
+        raise ValueError("Vstupenky lze přidat jen k události typu Zábava.")
+    # Only one render at a time, important on Raspberry Pi.
+    if not TICKET_SCAN_LOCK.acquire(blocking=False):
+        raise ValueError("Právě zpracovávám jiné vstupenky. Zkus to za chvíli.")
+    try:
+        return _save_ticket_bundle(event_id, original_name, body, mime_type)
+    finally:
+        TICKET_SCAN_LOCK.release()
 
-    clean_name = Path((original_name or "vstupenka").replace("\\", "/")).name.strip()[:180] or "vstupenka"
+
+def _save_ticket_bundle(event_id, original_name, body, mime_type):
+    clean_name = Path((original_name or "vstupenky").replace("\\", "/")).name.strip()[:180] or "vstupenky"
     token = uuid.uuid4().hex
     stored_name = token + TICKET_TYPES[mime_type]
-    qr_name = token + "-qr.png"
-    stored_path = safe_ticket_path(stored_name)
-    qr_path = safe_ticket_path(qr_name)
     Path(TICKET_DIR).mkdir(parents=True, exist_ok=True)
-    stored_path.write_bytes(body)
-    qr_value = extract_qr(stored_path, mime_type, qr_path)
-    if not qr_value:
-        try:
-            qr_path.unlink(missing_ok=True)
-        except OSError:
-            pass
-        qr_name = ""
-
-    old = get_ticket(event_id, owner)
-    if qr_value:
-        with db() as conn:
-            duplicate = conn.execute(
-                "SELECT owner FROM event_tickets WHERE event_id=? AND owner<>? AND qr_value=?",
-                (event_id, owner, qr_value),
-            ).fetchone()
-        if duplicate:
-            remove_ticket_files({"stored_name": stored_name, "qr_name": qr_name})
-            raise ValueError("Hanychova a Evina vstupenka nesmí mít stejný QR kód.")
+    new_files = []
     try:
-        with db() as conn:
-            conn.execute(
-                '''INSERT INTO event_tickets(event_id, owner, original_name, stored_name, mime_type, size, qr_name, qr_value)
-                   VALUES(?, ?, ?, ?, ?, ?, ?, ?)
-                   ON CONFLICT(event_id, owner) DO UPDATE SET original_name=excluded.original_name,
-                   stored_name=excluded.stored_name, mime_type=excluded.mime_type, size=excluded.size,
-                   qr_name=excluded.qr_name, qr_value=excluded.qr_value, updated_at=CURRENT_TIMESTAMP''',
-                (event_id, owner, clean_name, stored_name, mime_type, len(body), qr_name, qr_value),
-            )
-            conn.commit()
+        with tempfile.TemporaryDirectory(prefix="haneva-bundle-") as temp:
+            source = Path(temp) / ("source" + TICKET_TYPES[mime_type])
+            source.write_bytes(body)
+            try:
+                proc = subprocess.run(
+                    [sys.executable, str(Path(__file__).with_name("ticket_scan.py")), str(source), mime_type, temp],
+                    capture_output=True, timeout=75,
+                )
+                result = json.loads(proc.stdout)
+            except (OSError, subprocess.SubprocessError, ValueError):
+                raise ValueError("Rozdělení vstupenek se nepodařilo dokončit. Zkus menší PDF nebo ostřejší obrázek.")
+            if proc.returncode or result.get("error"):
+                raise ValueError(result.get("error") or "QR kódy se nepodařilo načíst.")
+            codes = result.get("codes", [])
+            if not 1 <= len(codes) <= 50 or len({code["digest"] for code in codes}) != len(codes):
+                raise ValueError("Soubor musí obsahovat čitelné, vzájemně odlišné QR kódy.")
+            for code in codes:
+                if Path(code["file"]).name != code["file"]:
+                    raise ValueError("Neplatný výstup čtení vstupenek.")
+            target = safe_ticket_path(stored_name)
+            new_files.append(target)
+            shutil.copyfile(source, target)
+            rows = []
+            for index, code in enumerate(codes, 1):
+                owner = str(index)
+                qr_name = f"{token}-{owner}.png"
+                qr_path = safe_ticket_path(qr_name)
+                new_files.append(qr_path)
+                shutil.copyfile(Path(temp) / code["file"], qr_path)
+                rows.append((event_id, owner, clean_name, stored_name, mime_type, len(body), qr_name, code["digest"]))
+            # Original and all codes become visible together, never as a partial upload.
+            with db() as conn:
+                conn.execute("BEGIN IMMEDIATE")
+                event = conn.execute("SELECT event_type FROM events WHERE id=?", (event_id,)).fetchone()
+                if not event or event["event_type"] != "zabava":
+                    raise ValueError("Událost byla mezitím změněna nebo odstraněna.")
+                old = conn.execute("SELECT * FROM event_tickets WHERE event_id=?", (event_id,)).fetchall()
+                conn.execute("DELETE FROM event_tickets WHERE event_id=?", (event_id,))
+                conn.executemany(
+                    """INSERT INTO event_tickets(event_id, owner, original_name, stored_name, mime_type, size, qr_name, qr_value)
+                       VALUES(?, ?, ?, ?, ?, ?, ?, ?)""", rows)
+                conn.commit()
     except Exception:
-        remove_ticket_files({"stored_name": stored_name, "qr_name": qr_name})
+        for path in new_files:
+            path.unlink(missing_ok=True)
         raise
-    remove_ticket_files(old)
-    return ticket_metadata(get_ticket(event_id, owner))
+    for row in old:
+        remove_ticket_files(row)
+    return [ticket_metadata(row) for row in get_tickets(event_id)]
 
 
 def delete_ticket(event_id, owner=None):
@@ -547,7 +511,7 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as exc:
                 self.send_json({"error": str(exc)}, 400)
             return
-        ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets/(hanych|eva)(?:/(file|qr))?", path)
+        ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets/(hanych|eva|[1-9]\d?)(?:/(file|qr))?", path)
         if ticket_match:
             event_id = int(ticket_match.group(1))
             owner = ticket_match.group(2)
@@ -564,7 +528,7 @@ class Handler(BaseHTTPRequestHandler):
             if not path_on_disk or (kind == "qr" and not name):
                 self.send_json({"error": "QR kód se ve vstupence nepodařilo najít."}, 404)
                 return
-            download_name = f'{TICKET_OWNERS[owner]} - {row["original_name"]}' if kind == "file" else None
+            download_name = row["original_name"] if kind == "file" else None
             self.send_file(path_on_disk, row["mime_type"] if kind == "file" else "image/png", download_name)
             return
         if path.startswith("/api/events/"):
@@ -597,7 +561,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         path = urlparse(self.path).path
         try:
-            ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets/(hanych|eva)", path)
+            ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets", path)
             if ticket_match:
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
@@ -608,8 +572,11 @@ class Handler(BaseHTTPRequestHandler):
                 if length > MAX_TICKET_SIZE:
                     raise ValueError("Vstupenka může mít nejvýše 15 MB.")
                 filename = unquote(self.headers.get("X-Filename", "vstupenka"))
-                ticket = save_ticket(int(ticket_match.group(1)), ticket_match.group(2), filename, self.rfile.read(length))
-                self.send_json({"ticket": ticket}, 201)
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Soubor nebyl nahrán celý. Zkus to znovu.")
+                tickets = save_ticket_bundle(int(ticket_match.group(1)), filename, body)
+                self.send_json({"tickets": tickets}, 201)
                 return
             if path == "/api/events":
                 event = normalize_event(self.read_json())
@@ -640,6 +607,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc)}, 400)
         except KeyError as exc:
             self.send_json({"error": str(exc.args[0])}, 404)
+        except OSError:
+            self.send_json({"error": "Soubor se nepodařilo uložit. Zkontroluj volné místo a zkus to znovu."}, 500)
 
     def do_PUT(self):
         path = urlparse(self.path).path
@@ -693,6 +662,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_DELETE(self):
         path = urlparse(self.path).path
+        bundle_match = re.fullmatch(r"/api/events/(\d+)/tickets", path)
+        if bundle_match:
+            delete_ticket(int(bundle_match.group(1)))
+            self.send_json({"ok": True})
+            return
         ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets/(hanych|eva)", path)
         if ticket_match:
             if not delete_ticket(int(ticket_match.group(1)), ticket_match.group(2)):
