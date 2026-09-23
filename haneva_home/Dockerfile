@@ -1,6 +1,6 @@
 FROM ghcr.io/home-assistant/base:latest
 
-RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 py3-pillow py3-pyzbar coreutils poppler-utils
+RUN apk add --no-cache python3 py3-requests py3-beautifulsoup4 py3-pillow py3-pyzbar coreutils poppler-utils tesseract-ocr tesseract-ocr-data-ces
 
 # Nejprve sestavíme původní Rozpočet domácnosti přesně stejným způsobem
 # jako v samostatném add-onu a uložíme ho pod /app/budget.
