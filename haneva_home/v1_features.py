@@ -922,6 +922,21 @@ def _work_extract_afternoons(words, model, source_name, image_width, region_left
                     "reason": "Jméno bylo rozpoznáno uvnitř odpoledního bloku a na řádku tohoto data.",
                 },
             }
+    # Pro log necháme jako "přijatý" právě jeden nejlepší důkaz pro každý den.
+    best_diag = {}
+    for index, diagnostic in enumerate(diagnostics):
+        if not diagnostic.get("accepted") or not diagnostic.get("row_day"):
+            continue
+        day = diagnostic["row_day"]
+        if day not in best_diag or diagnostic.get("similarity", 0) > diagnostics[best_diag[day]].get("similarity", 0):
+            best_diag[day] = index
+    selected_indexes = set(best_diag.values())
+    for index, diagnostic in enumerate(diagnostics):
+        if diagnostic.get("accepted") and index not in selected_indexes:
+            diagnostic["accepted"] = False
+            diagnostic["decision"] = "duplicitni_kandidat"
+            diagnostic["reason"] = "Stejný den už má přesnější OCR důkaz pro Jana Vaňka."
+
     shifts = []
     for item in sorted(found.values(), key=lambda row: row["date"]):
         item.pop("score", None)
