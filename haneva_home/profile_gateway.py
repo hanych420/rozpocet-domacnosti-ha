@@ -20,7 +20,7 @@ app.DEFAULT_COLORS[PROP_CALENDAR] = PROP_COLOR
 
 ALLOWED_PROFILE_CALENDARS = set(app.ALLOWED_CALENDARS)
 PERSONS = {"hanych", "eva"}
-HOME_TILES = ("budget", "calendar", "shopping", "home-control")
+HOME_TILES = ("budget", "calendar", "shopping", "food", "insights", "wishlist", "home-control")
 
 PROFILE_STYLE = """
 <style id="haneva-calendar-profile-v1">
