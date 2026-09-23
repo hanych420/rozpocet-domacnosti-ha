@@ -4,6 +4,7 @@ from difflib import SequenceMatcher
 from statistics import median, mean
 import base64
 import hashlib
+import io
 import json
 import math
 import os
@@ -741,7 +742,7 @@ def _receipt_total(lines):
         n = norm(line)
         if any(norm(k) in n for k in keywords):
             values = [_money(m.group(1)) for m in MONEY_RE.finditer(line)]
-            values = [v for v in values if v is not None]
+            values = [v for v in values if v is not None and 0 < v <= 200000]
             if values:
                 candidates.append((2 if "celkem" in n or "uhrade" in n else 1, idx, max(values)))
     if candidates:
@@ -750,7 +751,7 @@ def _receipt_total(lines):
     values = []
     for line in lines[-15:]:
         values.extend(_money(m.group(1)) for m in MONEY_RE.finditer(line))
-    values = [v for v in values if v is not None]
+    values = [v for v in values if v is not None and 0 < v <= 200000]
     return max(values) if values else None
 
 
@@ -1318,7 +1319,16 @@ def save_plate(body, content_type=""):
     mime, _ = _mime_from_body(body, "plate.png", content_type)
     if mime == "application/pdf":
         raise ValueError("Nahraj fotografii talíře, ne PDF.")
-    Path(PLATE_PATH).write_bytes(body)
+    try:
+        image = Image.open(io.BytesIO(body))
+        image.load()
+        # Uložíme vždy skutečné PNG, aby multipart upload do Images API
+        # neposílal JPEG data s příponou a MIME typem PNG.
+        if image.mode not in ("RGB", "RGBA"):
+            image = image.convert("RGBA" if "transparency" in image.info else "RGB")
+        image.save(PLATE_PATH, format="PNG", optimize=True)
+    except Exception as exc:
+        raise ValueError("Referenční fotku se nepodařilo přečíst.") from exc
     return {"ok": True, "has_plate": True}
 
 
