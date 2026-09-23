@@ -644,6 +644,7 @@ def scan_work(original_name, body):
 def commit_work(payload):
     shifts = payload.get("shifts") or []
     added = 0
+    accepted = []
     with db() as conn:
         for row in shifts[:100]:
             if not isinstance(row, dict):
@@ -655,7 +656,25 @@ def commit_work(payload):
             cur = conn.execute("INSERT OR IGNORE INTO work_shifts(work_date,shift,source_name) VALUES(?,?,?)",
                                (day, shift, _clean(row.get("source_name"), 180)))
             added += cur.rowcount
+            accepted.append((day, shift))
         conn.commit()
+    # Work shifts are also real calendar events. Keep the import idempotent.
+    calendar_path = "/data/calendar.db"
+    if accepted and Path(calendar_path).exists():
+        with sqlite3.connect(calendar_path, timeout=10) as conn:
+            for day, shift in accepted:
+                title = "Práce – dopolední" if shift == "dopoledni" else "Práce – odpolední"
+                marker = "Automaticky importováno ze směn Jan Vaněk."
+                exists = conn.execute(
+                    "SELECT 1 FROM events WHERE calendar='hanych' AND start_date=? AND title=? AND notes=? LIMIT 1",
+                    (day, title, marker),
+                ).fetchone()
+                if not exists:
+                    conn.execute("""INSERT INTO events
+                      (title,calendar,start_date,end_date,start_time,end_time,all_day,location,notes,recurrence,event_type)
+                      VALUES(?,?,?,?,?,?,?,?,?,'none','')""",
+                      (title, "hanych", day, day, "", "", 1, "", marker))
+            conn.commit()
     return {"added": added, "shifts": work_shifts()}
 
 
