@@ -1,7 +1,7 @@
 import os
 from datetime import date, timedelta
 from http.server import ThreadingHTTPServer
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, unquote
 
 import app
 import gateway
@@ -10,10 +10,16 @@ import agenda_gateway
 import shopping
 import shopping_official
 import home_control
+import v1_features
 
 VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
 SMART_HOME_HTML_PATH = "/app/smart_home.html"
+FOOD_HTML_PATH = "/app/food.html"
+WISHLIST_HTML_PATH = "/app/wishlist.html"
+RECEIPTS_HTML_PATH = "/app/receipts.html"
+INSIGHTS_HTML_PATH = "/app/insights.html"
+WORK_HTML_PATH = "/app/work.html"
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
 # po úspěšné migraci se přepne na embedded server ve stejném kontejneru.
@@ -239,7 +245,51 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         parsed = urlparse(self.path)
         path = parsed.path
 
-        if path in ("/domov", "/domov/"):
+        v1_pages = {
+            "/jidlo": FOOD_HTML_PATH, "/jidlo/": FOOD_HTML_PATH,
+            "/wishlist": WISHLIST_HTML_PATH, "/wishlist/": WISHLIST_HTML_PATH,
+            "/uctenky": RECEIPTS_HTML_PATH, "/uctenky/": RECEIPTS_HTML_PATH,
+            "/prehledy": INSIGHTS_HTML_PATH, "/prehledy/": INSIGHTS_HTML_PATH,
+            "/kalendar/prace": WORK_HTML_PATH, "/kalendar/prace/": WORK_HTML_PATH,
+        }
+        if path in v1_pages:
+            try:
+                self.send_bytes(app.read_page(v1_pages[path]))
+            except OSError:
+                self.send_bytes(b"Page not found\n", 500, "text/plain; charset=utf-8")
+            return
+
+        if path == "/api/v1/recipes":
+            self.send_json({"recipes": v1_features.list_recipes()})
+            return
+        if path == "/api/v1/planned":
+            self.send_json(v1_features.planned_recipes())
+            return
+        if path == "/api/v1/tinder":
+            person = (parse_qs(parsed.query).get("person", [""])[0] or "").strip().lower()
+            self.send_json(v1_features.tinder_state(person))
+            return
+        if path == "/api/v1/shopping-preview":
+            self.send_json(v1_features.shopping_preview())
+            return
+        if path == "/api/v1/wishlist":
+            self.send_json({"items": v1_features.wishlist_list()})
+            return
+        if path == "/api/v1/prices":
+            self.send_json({"items": v1_features.price_history()})
+            return
+        if path == "/api/v1/receipts":
+            self.send_json({"receipts": v1_features.receipt_list()})
+            return
+        if path == "/api/v1/work":
+            query = parse_qs(parsed.query)
+            self.send_json({"shifts": v1_features.work_shifts(query.get("start", [None])[0], query.get("end", [None])[0])})
+            return
+        if path == "/api/v1/insights":
+            self.send_json(v1_features.finance_insights())
+            return
+
+        if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/", "/kalendar/prace", "/kalendar/prace/"):
             try:
                 self.send_bytes(app.read_page(SMART_HOME_HTML_PATH))
             except OSError:
@@ -298,6 +348,53 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
     def do_POST(self):
         path = urlparse(self.path).path
+
+        try:
+            if path == "/api/v1/recipes":
+                self.send_json({"recipe": v1_features.save_recipe(self.read_json())}, 201)
+                return
+            if path == "/api/v1/tinder/vote":
+                payload = self.read_json()
+                self.send_json(v1_features.vote_recipe(payload.get("recipe_id"), payload.get("person"), payload.get("vote")))
+                return
+            if path == "/api/v1/planned/add":
+                payload = self.read_json()
+                self.send_json(v1_features.add_plan(payload.get("recipe_id")))
+                return
+            if path == "/api/v1/shopping-preview/add":
+                self.send_json(v1_features.add_preview_to_shopping(self.read_json()))
+                return
+            if path == "/api/v1/wishlist":
+                payload = self.read_json()
+                payload["created_by"] = profile_gateway.session_payload(profile_gateway.access_email(self)).get("person", "")
+                self.send_json({"item": v1_features.save_wishlist(payload)}, 201)
+                return
+            if path in {"/api/v1/receipts/scan", "/api/v1/work/scan"}:
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > v1_features.MAX_UPLOAD:
+                    raise ValueError("Soubor chybí nebo je příliš velký.")
+                filename = unquote(self.headers.get("X-Filename", "upload"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Soubor nebyl nahrán celý.")
+                if path.endswith("/receipts/scan"):
+                    self.send_json({"receipt": v1_features.scan_receipt(filename, body)})
+                else:
+                    self.send_json(v1_features.scan_work(filename, body))
+                return
+            if path == "/api/v1/receipts/commit":
+                self.send_json(v1_features.commit_receipt(self.read_json()), 201)
+                return
+            if path == "/api/v1/work/commit":
+                self.send_json(v1_features.commit_work(self.read_json()), 201)
+                return
+        except (ValueError, TypeError, KeyError) as exc:
+            message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
+            self.send_json({"error": str(message)}, 400)
+            return
 
         if path == "/api/domov/entity":
             try:
@@ -379,6 +476,55 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
         super().do_POST()
 
+    def do_PUT(self):
+        path = urlparse(self.path).path
+        try:
+            match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)", path)
+            if match:
+                self.send_json({"recipe": v1_features.save_recipe(self.read_json(), int(match.group(1)))})
+                return
+            match = __import__("re").fullmatch(r"/api/v1/planned/(\d+)", path)
+            if match:
+                payload = self.read_json()
+                v1_features.set_plan_cooked(int(match.group(1)), bool(payload.get("cooked", True)))
+                self.send_json(v1_features.planned_recipes())
+                return
+            match = __import__("re").fullmatch(r"/api/v1/wishlist/(\d+)", path)
+            if match:
+                self.send_json({"item": v1_features.save_wishlist(self.read_json(), int(match.group(1)))})
+                return
+            if path == "/api/v1/settings/reset-day":
+                payload = self.read_json()
+                day = int(payload.get("day"))
+                if not 0 <= day <= 6:
+                    raise ValueError("Den musí být 0 až 6.")
+                v1_features.set_setting("recipe_reset_day", day)
+                self.send_json(v1_features.planned_recipes())
+                return
+        except (ValueError, TypeError, KeyError) as exc:
+            message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
+            self.send_json({"error": str(message)}, 400)
+            return
+        return super().do_PUT()
+
+    def do_DELETE(self):
+        path = urlparse(self.path).path
+        try:
+            match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)", path)
+            if match:
+                v1_features.delete_recipe(int(match.group(1)))
+                self.send_json({"ok": True})
+                return
+            match = __import__("re").fullmatch(r"/api/v1/wishlist/(\d+)", path)
+            if match:
+                v1_features.delete_wishlist(int(match.group(1)))
+                self.send_json({"ok": True})
+                return
+        except KeyError as exc:
+            self.send_json({"error": str(exc.args[0])}, 404)
+            return
+        return super().do_DELETE()
+
     def do_HEAD(self):
         path = urlparse(self.path).path
         if path in ("/domov", "/domov/"):
@@ -391,6 +537,7 @@ if __name__ == "__main__":
     profile_gateway.init_profile_db()
     app.init_db()
     home_control.init_db()
+    v1_features.init_db()
     shopping_official.init_db()
     shopping_official.start_worker()
     server = ThreadingHTTPServer((gateway.HOST, gateway.PORT), ConsolidatedGatewayHandler)

@@ -287,6 +287,25 @@ def set_watched(payload):
     return {"name": name[:160], "name_norm": norm, "watched": watched}
 
 
+
+def record_purchase(name):
+    """Započítá jeden skutečně dokončený nákup bez vytvoření položky seznamu."""
+    name = _clean(name)[:160]
+    if not name:
+        return
+    norm = normalize_name(name)
+    now = datetime.now(timezone.utc).isoformat()
+    with db() as conn:
+        conn.execute('''
+            INSERT INTO history(name_norm, display_name, times_completed, last_completed_at)
+            VALUES(?, ?, 1, ?)
+            ON CONFLICT(name_norm) DO UPDATE SET
+                display_name=excluded.display_name,
+                times_completed=history.times_completed + 1,
+                last_completed_at=excluded.last_completed_at
+        ''', (norm, name, now))
+        conn.commit()
+
 def _candidate_queries():
     result, seen = [], set()
     with db() as conn:

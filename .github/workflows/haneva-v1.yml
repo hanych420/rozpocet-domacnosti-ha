@@ -1,0 +1,25 @@
+name: Haneva 1.0 checks
+
+on:
+  pull_request:
+    paths:
+      - 'haneva_home/**'
+      - '.github/workflows/haneva-v1.yml'
+  workflow_dispatch:
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Python
+        run: python -m compileall -q haneva_home
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Home Assistant add-on image
+        run: docker build -t haneva-home:test haneva_home
