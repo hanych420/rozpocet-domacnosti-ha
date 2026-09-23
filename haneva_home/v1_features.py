@@ -1236,11 +1236,12 @@ def commit_work_shifts(payload):
                 continue
             title = f"Práce · {shift_type}"
             notes = "Haneva: automaticky importovaná směna pro Jan Vaněk."
+            start_time, end_time = ("08:00", "16:00") if shift_type == "dopolední" else ("14:00", "22:00")
             cur = cal.execute(
                 """INSERT INTO events
                    (title,calendar,start_date,end_date,start_time,end_time,all_day,location,notes,recurrence,event_type)
                    VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
-                (title, "hanych", shift_date, shift_date, "", "", 1, "", notes, "none", ""),
+                (title, "hanych", shift_date, shift_date, start_time, end_time, 0, "", notes, "none", ""),
             )
             event_id = cur.lastrowid
             with db() as conn:
