@@ -289,7 +289,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             self.send_json(v1_features.finance_insights())
             return
 
-        if path in ("/domov", "/domov/"):
+        if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/", "/kalendar/prace", "/kalendar/prace/"):
             try:
                 self.send_bytes(app.read_page(SMART_HOME_HTML_PATH))
             except OSError:
