@@ -967,13 +967,28 @@ def _scan_work_image(image_path, source_name):
 
     top = max(0, int(model["day1_y"] - model["spacing"] * 2.5))
     bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
-    left = _work_vertical_boundary(image_path, top, bottom, 0.54, 0.68, 0.612)
-    right = _work_vertical_boundary(image_path, top, bottom, 0.81, 0.93, 0.867)
+    left = _work_vertical_boundary(image_path, top, bottom, 0.54, 0.68, 0.615)
+    right = _work_vertical_boundary(image_path, top, bottom, 0.81, 0.93, 0.863)
     if right <= left + width * 0.08:
-        left, right = int(width * 0.612), int(width * 0.867)
+        left, right = int(width * 0.615), int(width * 0.863)
 
-    crop = (min(width - 2, left + 2), top, max(left + 4, right - 2), bottom)
-    words = _work_ocr_words(image_path, crop, requested_scale=4.3, psm=6)
+    # Odpolední blok má v používané tabulce čtyři stejně široké sloupce.
+    # OCR po jednotlivých sloupcích výrazně omezuje rušení svislými čarami.
+    span = right - left
+    words = []
+    for column in range(4):
+        x1 = left + round(span * column / 4) + 3
+        x2 = left + round(span * (column + 1) / 4) - 3
+        if x2 <= x1:
+            continue
+        words.extend(_work_ocr_words(image_path, (x1, top, x2, bottom), requested_scale=6.0, psm=6))
+    # Jeden společný průchod zachytí případy, kdy OCR rozdělí jméno netypicky.
+    words.extend(_work_ocr_words(
+        image_path,
+        (min(width - 2, left + 2), top, max(left + 4, right - 2), bottom),
+        requested_scale=4.3,
+        psm=6,
+    ))
     shifts, diagnostics = _work_extract_afternoons(words, model, source_name, width, left, right)
     debug_text = " ".join(word["text"] for word in words)[:30000]
     meta = {"width": width, "height": height, "model": model, "left": left, "right": right}
