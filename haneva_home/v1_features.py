@@ -793,7 +793,14 @@ def _increment_completed_history(name):
 def _match_receipt_items(receipt_id, items, store, purchased_at):
     state = shopping.get_state()
     open_items = [i for i in state["items"] if not i["checked"]]
-    checked_items = [i for i in state["items"] if i["checked"]]
+    purchase_date = _parse_date_any(purchased_at)
+    checked_items = []
+    for candidate in state["items"]:
+        if not candidate["checked"]:
+            continue
+        checked_date = _parse_date_any(candidate.get("checked_at"))
+        if purchase_date and checked_date and abs((checked_date - purchase_date).days) <= 2:
+            checked_items.append(candidate)
     results = []
     for item in items:
         best, score = None, 0.0
