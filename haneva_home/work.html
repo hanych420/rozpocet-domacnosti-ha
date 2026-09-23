@@ -1,36 +1,198 @@
-<!doctype html><html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Práce · Haneva</title>
-<style>body{margin:0;font-family:Inter,system-ui;background:#f6f7fb;color:#172033}.wrap{width:min(900px,calc(100% - 28px));margin:auto;padding:22px 0 50px}.top{display:flex;justify-content:space-between;margin-bottom:24px}.brand,.back{color:inherit;text-decoration:none;font-weight:850}.back{font-size:13px;color:#667085}h1{font-size:clamp(42px,8vw,68px);margin:0 0 8px;letter-spacing:-.05em}.lead{color:#707887}.panel{background:#fff;border-radius:22px;padding:16px;box-shadow:0 16px 44px rgba(31,41,55,.08);margin-top:16px}.upload{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.upload input{position:absolute;width:1px;height:1px;opacity:0}.paste-zone{margin-top:12px;border:1.5px dashed #cbd5e1;border-radius:14px;padding:14px;text-align:center;background:#f8fafc;color:#64748b;font-size:13px;font-weight:750;transition:.15s}.paste-zone.active{border-color:#111827;background:#eef2ff;color:#111827}.primary,.secondary{border:0;border-radius:12px;padding:11px 14px;font-weight:850}.primary{background:#111827;color:white}.secondary{background:#eef1f5;color:#4b5563}.rows{margin-top:14px;display:flex;flex-direction:column;gap:7px}.row{display:grid;grid-template-columns:150px 1fr auto;gap:8px;align-items:center;border:1px solid #e8eaf0;border-radius:13px;padding:9px}.row input,.row select{border:1px solid #dfe3ea;border-radius:9px;padding:8px}.muted{font-size:12px;color:#7b8492}.saved{display:flex;gap:9px;flex-wrap:wrap}.chip{padding:8px 10px;border-radius:999px;background:#eef2ff;font-size:12px;font-weight:800}.hidden{display:none!important}@media(max-width:620px){.row{grid-template-columns:1fr 1fr}.row button{grid-column:1/-1}}</style></head>
-<body><main class="wrap"><div class="top"><a class="brand" href="/">Haneva</a><a class="back" href="/kalendar">← Kalendář</a></div><h1>Práce</h1><p class="lead">Nahraj screenshot směn. Haneva hledá „Jan Vaněk“, připraví náhled a až pak směny uloží.</p>
-<section class="panel"><div class="upload"><label class="primary" for="file">📷 Nahrát screenshot směn</label><input id="file" type="file" accept="image/*,application/pdf"><span class="muted" id="status">JPG, PNG, WebP nebo PDF</span></div><div class="paste-zone" id="pasteZone">Nebo udělej screenshot a stiskni <strong>Ctrl + V</strong> kdekoliv na této stránce.</div><div id="preview" class="hidden"><div class="rows" id="rows"></div><button class="primary" id="save" style="margin-top:12px">Přidat do kalendáře práce</button></div></section>
-<section class="panel"><h2 style="margin-top:0">Uložené směny</h2><div class="saved" id="saved"></div></section></main>
-<script>var $=function(i){return document.getElementById(i)},draft=[];
-async function scanFile(f){
-  if(!f)return;
-  $('status').textContent='Čtu screenshot…';
-  $('pasteZone').classList.add('active');
-  try{
-    var r=await fetch('/api/v1/work/scan',{method:'POST',headers:{'Content-Type':f.type||'application/octet-stream','X-Filename':encodeURIComponent(f.name||'screenshot.png')},body:f});
-    var d=await r.json();
-    if(!r.ok)throw new Error(d.error||'Nepodařilo se načíst směny.');
-    draft=d.shifts||[];
-    $('status').textContent=draft.length?'Rozpoznáno '+draft.length+' směn. Zkontroluj je před uložením.':'Jan Vaněk nebyl s datem a typem směny bezpečně rozpoznán.';
-    renderPreview();
-  }catch(e){
-    $('status').textContent=e.message;
-  }finally{
-    $('pasteZone').classList.remove('active');
-  }
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#111827">
+<title>Práce · Haneva</title>
+<style>
+:root{--bg:#f5f7fb;--surface:#fff;--text:#172033;--muted:#6b7280;--line:#e6e9ef;--shadow:0 16px 44px rgba(31,41,55,.08);--work:#4f46e5;--work-bg:#eef2ff}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--text);background:radial-gradient(circle at 0 0,rgba(129,140,248,.18),transparent 30rem),var(--bg)}
+button,input{font:inherit}button{cursor:pointer}.wrap{width:min(1120px,calc(100% - 28px));margin:0 auto;padding:22px 0 52px}.top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}.brand{display:flex;align-items:center;gap:11px;color:inherit;text-decoration:none;font-weight:850}.brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:#111827;color:#fff;box-shadow:0 10px 24px rgba(17,24,39,.18)}.back{color:#596174;text-decoration:none;font-size:14px;font-weight:750}
+.hero{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;margin-bottom:16px}.hero h1{margin:0 0 7px;font-size:clamp(42px,7vw,64px);line-height:1;letter-spacing:-.05em}.hero p{margin:0;color:var(--muted);font-size:15px}.only{display:inline-flex;align-items:center;gap:7px;border-radius:999px;background:#eef2ff;color:#4338ca;font-size:12px;font-weight:850;padding:8px 11px;white-space:nowrap}
+.panel{background:rgba(255,255,255,.95);border:1px solid rgba(255,255,255,.96);border-radius:22px;box-shadow:var(--shadow);padding:16px;margin-top:14px}.upload{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.upload input{position:absolute;width:1px;height:1px;opacity:0}.primary,.secondary,.ghost{border:0;border-radius:12px;padding:10px 13px;font-weight:850}.primary{background:#111827;color:#fff}.secondary{background:#eef1f5;color:#4b5563}.ghost{background:transparent;color:#5f6877;border:1px solid var(--line)}.paste-zone{margin-top:11px;border:1.5px dashed #cbd5e1;border-radius:14px;padding:13px;text-align:center;background:#f8fafc;color:#64748b;font-size:13px;font-weight:750;transition:.15s}.paste-zone.active{border-color:#111827;background:#eef2ff;color:#111827}.muted{font-size:12px;color:#7b8492}.hidden{display:none!important}
+.preview{margin-top:14px;border-top:1px solid var(--line);padding-top:13px}.preview-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:9px}.preview-title{font-size:13px;font-weight:900}.rows{display:flex;flex-direction:column;gap:7px}.row{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:8px;align-items:center;border:1px solid var(--line);border-radius:13px;padding:9px}.row input{border:1px solid #dfe3ea;border-radius:9px;padding:8px}.shift-pill{display:inline-flex;width:max-content;border-radius:999px;background:var(--work-bg);color:#4338ca;padding:6px 9px;font-size:11px;font-weight:850}.evidence{font-size:10px;color:#818898;margin-top:3px}.diag{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.diag summary{cursor:pointer;font-size:12px;font-weight:850;color:#5f6877}.diag-meta{margin:9px 0;font-size:11px;color:#7b8492}.diag-list{max-height:240px;overflow:auto;display:flex;flex-direction:column;gap:5px}.diag-item{font-size:11px;line-height:1.45;padding:8px 9px;border-radius:10px;background:#f8fafc;color:#596174}.diag-item.ok{background:#ecfdf5;color:#047857}.diag-item strong{color:inherit}.scan-history{margin-top:10px}.scan-line{display:flex;justify-content:space-between;gap:10px;padding:8px 6px;border-bottom:1px solid #f0f2f5;font-size:11px;color:#737b89;border-radius:8px;cursor:pointer}.scan-line:hover{background:#f8fafc}
+.calendar-panel{padding:0;overflow:hidden}.calendar-head{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line)}.calendar-head h2{margin:0;font-size:22px;letter-spacing:-.025em}.calendar-controls{display:flex;gap:6px;align-items:center}.icon-btn{width:38px;height:38px;border:1px solid var(--line);border-radius:11px;background:#fff;color:#4b5563;font-weight:900}.today-btn{border:1px solid var(--line);border-radius:11px;background:#fff;color:#4b5563;padding:9px 11px;font-size:12px;font-weight:850}.weekdays,.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}.weekdays{border-bottom:1px solid var(--line);background:#fafbfc}.weekday{padding:9px 8px;text-align:center;font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#88909d;font-weight:850}.day{min-height:118px;padding:8px;border-right:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff}.day:nth-child(7n){border-right:0}.day.other{background:#fafbfc;color:#b1b7c0}.day.today{box-shadow:inset 0 0 0 2px rgba(79,70,229,.18)}.day-number{display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:9px;font-size:12px;font-weight:850;margin-bottom:6px}.day.today .day-number{background:#111827;color:#fff}.work-event{border-radius:10px;background:var(--work-bg);border-left:3px solid var(--work);padding:7px 8px;font-size:11px;line-height:1.3;color:#3730a3;font-weight:850}.work-event span{display:block;margin-top:2px;color:#6366f1;font-size:9px;font-weight:750}.calendar-empty{padding:18px;color:#8b93a0;font-size:12px}.month-count{font-size:11px;color:#818898;font-weight:750}
+@media(max-width:700px){.wrap{width:min(100% - 18px,1120px);padding-top:14px}.top{margin-bottom:20px}.back{font-size:12px}.hero{align-items:flex-start;flex-direction:column}.only{align-self:flex-start}.panel{border-radius:18px;padding:13px}.row{grid-template-columns:1fr auto}.row .shift-wrap{grid-column:1/2}.row button{grid-column:2/3;grid-row:1/3}.calendar-head{padding:13px}.calendar-head h2{font-size:18px}.day{min-height:78px;padding:4px}.day-number{width:24px;height:24px;font-size:10px}.work-event{padding:5px;font-size:9px;border-left-width:2px}.work-event span{display:none}.weekday{font-size:8px;padding:7px 2px}.today-btn{display:none}}
+</style>
+</head>
+<body>
+<main class="wrap">
+  <div class="top">
+    <a class="brand" href="/" aria-label="Haneva domů"><span class="brand-mark">H</span><span>Haneva</span></a>
+    <a class="back" href="/kalendar">← Kalendář</a>
+  </div>
+
+  <section class="hero">
+    <div><h1>Práce</h1><p>Samostatný pracovní kalendář a import směn ze screenshotu.</p></div>
+    <div class="only">● Zobrazuji pouze odpolední 14:00–22:00</div>
+  </section>
+
+  <section class="panel">
+    <div class="upload">
+      <label class="primary" for="file">📷 Nahrát screenshot směn</label>
+      <input id="file" type="file" accept="image/*,application/pdf">
+      <span class="muted" id="status">Nebo vlož screenshot přes Ctrl + V.</span>
+    </div>
+    <div class="paste-zone" id="pasteZone">Udělej screenshot tabulky a stiskni <strong>Ctrl + V</strong> kdekoliv na této stránce.</div>
+
+    <div class="preview hidden" id="preview">
+      <div class="preview-head"><div class="preview-title" id="previewTitle">Rozpoznané odpolední směny</div><button class="primary" id="save">Uložit do pracovního kalendáře</button></div>
+      <div class="rows" id="rows"></div>
+      <details class="diag" id="diagDetails">
+        <summary>Diagnostika OCR – proč byla směna rozpoznána</summary>
+        <div class="diag-meta" id="diagMeta"></div>
+        <div class="diag-list" id="diagList"></div>
+      </details>
+    </div>
+
+    <details class="diag scan-history">
+      <summary>Poslední OCR pokusy</summary>
+      <div id="scanHistory"></div>
+    </details>
+  </section>
+
+  <section class="panel calendar-panel">
+    <div class="calendar-head">
+      <div><h2 id="monthTitle">—</h2><div class="month-count" id="monthCount"></div></div>
+      <div class="calendar-controls"><button class="today-btn" id="todayBtn">Dnes</button><button class="icon-btn" id="prevMonth" aria-label="Předchozí měsíc">‹</button><button class="icon-btn" id="nextMonth" aria-label="Další měsíc">›</button></div>
+    </div>
+    <div class="weekdays"><div class="weekday">Po</div><div class="weekday">Út</div><div class="weekday">St</div><div class="weekday">Čt</div><div class="weekday">Pá</div><div class="weekday">So</div><div class="weekday">Ne</div></div>
+    <div class="calendar-grid" id="calendarGrid"></div>
+  </section>
+</main>
+
+<script>
+var $=function(i){return document.getElementById(i)};
+var draft=[],scanId=null,diagnostics=[],currentMonth=new Date(new Date().getFullYear(),new Date().getMonth(),1),shifts=[];
+
+async function api(url,opt){
+  opt=opt||{};opt.cache='no-store';
+  var r=await fetch(url,opt),d=await r.json();
+  if(!r.ok)throw new Error(d.error||'Chyba');
+  return d;
 }
-async function api(u,o){o=o||{};o.cache='no-store';var r=await fetch(u,o),d=await r.json();if(!r.ok)throw new Error(d.error||'Chyba');return d}function rowHtml(x,i){return '<div class="row" data-i="'+i+'"><input class="date" type="date" value="'+(x.date||'')+'"><select class="shift"><option value="dopoledni" '+(x.shift==='dopoledni'?'selected':'')+'>Dopolední</option><option value="odpoledni" '+(x.shift==='odpoledni'?'selected':'')+'>Odpolední</option></select><button class="secondary" type="button">Odebrat</button></div>'}function renderPreview(){var b=$('rows');b.innerHTML=draft.map(rowHtml).join('');[].slice.call(b.querySelectorAll('.row')).forEach(function(r){var i=Number(r.dataset.i);r.querySelector('button').onclick=function(){draft.splice(i,1);renderPreview()};r.querySelector('.date').onchange=function(){draft[i].date=this.value};r.querySelector('.shift').onchange=function(){draft[i].shift=this.value}});$('preview').classList.toggle('hidden',!draft.length)}async function loadSaved(){var d=await api('/api/v1/work'),b=$('saved');b.innerHTML='';if(!d.shifts.length){b.innerHTML='<span class="muted">Zatím žádné směny.</span>';return}d.shifts.forEach(function(x){var e=document.createElement('span');e.className='chip';e.textContent=new Date(x.work_date+'T12:00:00').toLocaleDateString('cs-CZ')+' · '+(x.shift==='dopoledni'?'dopolední':'odpolední');b.appendChild(e)})}$('file').onchange=function(){scanFile(this.files[0])};
+function pad(n){return String(n).padStart(2,'0')}
+function isoDate(d){return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())}
+function fmtDate(s){return new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(new Date(s+'T12:00:00'))}
+function monthName(d){var s=new Intl.DateTimeFormat('cs-CZ',{month:'long',year:'numeric'}).format(d);return s.charAt(0).toUpperCase()+s.slice(1)}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]})}
+
+function renderPreview(){
+  var box=$('rows');box.innerHTML='';
+  $('preview').classList.toggle('hidden',!draft.length && !diagnostics.length);
+  $('previewTitle').textContent='Rozpoznané odpolední směny: '+draft.length;
+  draft.forEach(function(x,index){
+    var row=document.createElement('div');row.className='row';
+    var ev=x.evidence||{};
+    row.innerHTML='<input class="date" type="date" value="'+esc(x.date||'')+'"><div class="shift-wrap"><div class="shift-pill">Odpolední · 14:00–22:00</div><div class="evidence">'+(ev.token?'OCR: „'+esc(ev.token)+'“ · shoda '+esc(ev.similarity)+' %':'')+'</div></div><button class="secondary" type="button">Odebrat</button>';
+    row.querySelector('.date').onchange=function(){draft[index].date=this.value};
+    row.querySelector('button').onclick=function(){draft.splice(index,1);renderPreview()};
+    box.appendChild(row);
+  });
+  renderDiagnostics();
+}
+function renderDiagnostics(){
+  var accepted=diagnostics.filter(function(x){return x.accepted}),rejected=diagnostics.filter(function(x){return !x.accepted});
+  var summary=window.lastScanSummary||{};
+  $('diagMeta').textContent=(summary.month&&summary.year?'Tabulka '+summary.month+'/'+summary.year+' · ':'')+
+    (summary.region_left_percent!=null?'odpolední blok '+summary.region_left_percent+'–'+summary.region_right_percent+' % šířky screenshotu · ':'')+
+    'přijato '+accepted.length+' kandidátů, odmítnuto '+rejected.length+'.';
+  var rows=accepted.concat(rejected.slice(0,20)),box=$('diagList');box.innerHTML='';
+  if(!rows.length){box.innerHTML='<div class="diag-item">OCR neposkytlo žádného kandidáta podobného jménu Jan Vaněk.</div>';return}
+  rows.forEach(function(x){
+    var el=document.createElement('div');el.className='diag-item'+(x.accepted?' ok':'');
+    var day=x.row_day?' · řádek '+x.row_day+'.':'';var xpos=x.x_percent!=null?' · x '+x.x_percent+' %':'';
+    el.innerHTML='<strong>'+(x.accepted?'✓ Odpolední':'× Odmítnuto')+'</strong> · „'+esc(x.token||'')+'“ · podobnost '+esc(x.similarity)+' %'+day+xpos+'<br>'+esc(x.reason||'');
+    box.appendChild(el);
+  });
+}
+async function scanFile(file){
+  if(!file)return;
+  $('status').textContent='Čtu screenshot…';$('pasteZone').classList.add('active');
+  try{
+    var r=await fetch('/api/v1/work/scan',{method:'POST',headers:{'Content-Type':file.type||'application/octet-stream','X-Filename':encodeURIComponent(file.name||'screenshot.png')},body:file});
+    var d=await r.json();if(!r.ok)throw new Error(d.error||'Nepodařilo se načíst směny.');
+    draft=d.shifts||[];diagnostics=d.diagnostics||[];scanId=d.scan_id||null;window.lastScanSummary=d.summary||{};$('save').classList.remove('hidden');
+    $('status').textContent=draft.length?'Rozpoznáno '+draft.length+' odpoledních směn. Zkontroluj je před uložením.':'Nenašla se žádná bezpečně rozpoznaná odpolední směna.';
+    renderPreview();loadScanHistory();
+  }catch(e){$('status').textContent=e.message}
+  finally{$('pasteZone').classList.remove('active')}
+}
+$('file').onchange=function(){scanFile(this.files[0])};
 document.addEventListener('paste',function(e){
   var items=e.clipboardData&&e.clipboardData.items?Array.from(e.clipboardData.items):[];
-  var imageItem=items.find(function(item){return item.kind==='file'&&String(item.type||'').indexOf('image/')===0});
-  if(!imageItem)return;
-  var blob=imageItem.getAsFile();
-  if(!blob)return;
-  e.preventDefault();
+  var item=items.find(function(x){return x.kind==='file'&&String(x.type||'').indexOf('image/')===0});
+  if(!item)return;var blob=item.getAsFile();if(!blob)return;e.preventDefault();
   var ext=(blob.type.split('/')[1]||'png').replace('jpeg','jpg');
-  var file=new File([blob],'screenshot-schichty.'+ext,{type:blob.type||'image/png'});
-  scanFile(file);
+  scanFile(new File([blob],'screenshot-smeny.'+ext,{type:blob.type||'image/png'}));
 });
-$('save').onclick=async function(){var d=await api('/api/v1/work/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shifts:draft})});$('status').textContent='Uloženo '+d.added+' nových směn.';draft=[];renderPreview();loadSaved()};loadSaved();</script></body></html>
+$('save').onclick=async function(){
+  if(!draft.length)return;
+  var d=await api('/api/v1/work/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({shifts:draft,scan_id:scanId})});
+  $('status').textContent='Uloženo '+draft.length+' odpoledních směn.';
+  draft=[];diagnostics=[];scanId=null;renderPreview();await loadCalendar();await loadScanHistory();
+};
+
+function gridRange(month){
+  var first=new Date(month.getFullYear(),month.getMonth(),1);
+  var last=new Date(month.getFullYear(),month.getMonth()+1,0);
+  var firstMonday=new Date(first);var offset=(first.getDay()+6)%7;firstMonday.setDate(first.getDate()-offset);
+  var lastSunday=new Date(last);var tail=(7-last.getDay())%7;lastSunday.setDate(last.getDate()+tail);
+  return {start:firstMonday,end:lastSunday};
+}
+async function loadCalendar(){
+  var range=gridRange(currentMonth);
+  var d=await api('/api/v1/work?start='+encodeURIComponent(isoDate(range.start))+'&end='+encodeURIComponent(isoDate(range.end)));
+  shifts=d.shifts||[];renderCalendar(range);
+}
+function renderCalendar(range){
+  $('monthTitle').textContent=monthName(currentMonth);
+  var map={};shifts.forEach(function(x){map[x.work_date]=x});
+  var monthPrefix=currentMonth.getFullYear()+'-'+pad(currentMonth.getMonth()+1)+'-';
+  var count=shifts.filter(function(x){return x.work_date.indexOf(monthPrefix)===0}).length;
+  $('monthCount').textContent=count+' odpoledních směn v měsíci';
+  var box=$('calendarGrid');box.innerHTML='';var today=isoDate(new Date());
+  for(var d=new Date(range.start);d<=range.end;d.setDate(d.getDate()+1)){
+    var day=new Date(d),key=isoDate(day),cell=document.createElement('div');
+    cell.className='day'+(day.getMonth()!==currentMonth.getMonth()?' other':'')+(key===today?' today':'');
+    cell.innerHTML='<div class="day-number">'+day.getDate()+'</div>';
+    if(map[key]){
+      var ev=document.createElement('div');ev.className='work-event';ev.innerHTML='Práce – odpolední<span>14:00–22:00</span>';cell.appendChild(ev);
+    }
+    box.appendChild(cell);
+  }
+}
+$('prevMonth').onclick=function(){currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()-1,1);loadCalendar()};
+$('nextMonth').onclick=function(){currentMonth=new Date(currentMonth.getFullYear(),currentMonth.getMonth()+1,1);loadCalendar()};
+$('todayBtn').onclick=function(){var n=new Date();currentMonth=new Date(n.getFullYear(),n.getMonth(),1);loadCalendar()};
+
+async function loadScanHistory(){
+  try{
+    var d=await api('/api/v1/work/scans?limit=6'),box=$('scanHistory');box.innerHTML='';
+    if(!d.scans.length){box.innerHTML='<div class="muted" style="padding-top:8px">Zatím žádný OCR pokus.</div>';return}
+    d.scans.forEach(function(x){
+      var el=document.createElement('div');el.className='scan-line';
+      var when=new Date(String(x.created_at||'').replace(' ','T')+'Z');
+      var region=x.region_left_percent!=null?' · blok '+x.region_left_percent+'–'+x.region_right_percent+' %':'';
+      el.innerHTML='<span>#'+x.id+' · '+esc(x.source_name||'screenshot')+region+'</span><strong>'+x.detected_count+' odpoledních</strong>';
+      el.title='Kliknutím zobrazíš diagnostiku tohoto OCR pokusu.';
+      el.onclick=function(){
+        diagnostics=x.diagnostics||[];
+        window.lastScanSummary={month:x.month,year:x.year,region_left_percent:x.region_left_percent,region_right_percent:x.region_right_percent};
+        renderDiagnostics();
+        $('diagDetails').open=true;
+        $('preview').classList.remove('hidden');
+        $('previewTitle').textContent='Diagnostika OCR pokusu #'+x.id;
+        $('rows').innerHTML='<div class="muted">Toto je uložený diagnostický log. Směny z něj se znovu nepřidávají.</div>';
+        $('save').classList.add('hidden');
+      };
+      box.appendChild(el);
+    });
+  }catch(_){}
+}
+loadCalendar().catch(function(e){$('monthCount').textContent=e.message});
+loadScanHistory();
+</script>
+</body>
+</html>

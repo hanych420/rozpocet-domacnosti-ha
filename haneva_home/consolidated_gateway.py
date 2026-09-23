@@ -285,6 +285,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             query = parse_qs(parsed.query)
             self.send_json({"shifts": v1_features.work_shifts(query.get("start", [None])[0], query.get("end", [None])[0])})
             return
+        if path == "/api/v1/work/scans":
+            query = parse_qs(parsed.query)
+            try:
+                limit = int(query.get("limit", ["10"])[0])
+            except ValueError:
+                limit = 10
+            self.send_json({"scans": v1_features.work_scan_logs(limit)})
+            return
         if path == "/api/v1/insights":
             self.send_json(v1_features.finance_insights())
             return

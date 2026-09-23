@@ -126,12 +126,46 @@ def init_db():
           work_date TEXT NOT NULL,
           shift TEXT NOT NULL,
           source_name TEXT NOT NULL DEFAULT '',
+          scan_id INTEGER,
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
           UNIQUE(work_date, shift)
         );
+        CREATE TABLE IF NOT EXISTS work_scan_logs(
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          source_name TEXT NOT NULL DEFAULT '',
+          image_width INTEGER,
+          image_height INTEGER,
+          month INTEGER,
+          year INTEGER,
+          region_left REAL,
+          region_right REAL,
+          detected_count INTEGER NOT NULL DEFAULT 0,
+          diagnostics_json TEXT NOT NULL DEFAULT '[]',
+          ocr_text TEXT NOT NULL DEFAULT '',
+          created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
         """)
+        work_columns = {row["name"] for row in conn.execute("PRAGMA table_info(work_shifts)").fetchall()}
+        if "scan_id" not in work_columns:
+            conn.execute("ALTER TABLE work_shifts ADD COLUMN scan_id INTEGER")
+        # Od 1.0.3 je pracovní kalendář záměrně pouze pro odpolední směny.
+        conn.execute("DELETE FROM work_shifts WHERE shift='dopoledni'")
         conn.execute("INSERT OR IGNORE INTO settings(key,value) VALUES('recipe_reset_day',?)", (str(RESET_DAY_DEFAULT),))
         conn.commit()
+    calendar_path = "/data/calendar.db"
+    if Path(calendar_path).exists():
+        try:
+            with sqlite3.connect(calendar_path, timeout=10) as calendar_conn:
+                calendar_conn.execute(
+                    "DELETE FROM events WHERE title='Práce – dopolední' AND notes='Automaticky importováno ze směn Jan Vaněk.'"
+                )
+                calendar_conn.execute(
+                    """UPDATE events SET start_time='14:00',end_time='22:00',all_day=0,updated_at=CURRENT_TIMESTAMP
+                       WHERE title='Práce – odpolední' AND notes='Automaticky importováno ze směn Jan Vaněk.'"""
+                )
+                calendar_conn.commit()
+        except sqlite3.Error:
+            pass
 
 
 def _clean(value, limit=500):
@@ -619,26 +653,34 @@ def receipt_list(limit=30):
 
 
 def parse_work_text(text, source_name=""):
-    """Fallback for text-like exports. Screenshot parsing uses coordinates below."""
+    """Fallback pro textové exporty; od 1.0.3 vrací pouze odpolední směny."""
     lines = [_clean(x, 300) for x in str(text or "").splitlines() if _clean(x)]
     result, seen = [], set()
     current_date = None
     current_shift = None
+    diagnostics = []
     for line in lines:
         low = norm(line)
-        dm = DATE_RE.search(line)
-        if dm:
+        if DATE_RE.search(line):
             current_date = _parse_date(line)
         if "dopoled" in low or "ranni" in low or "rano" in low:
             current_shift = "dopoledni"
         elif "odpoled" in low:
             current_shift = "odpoledni"
-        if "jan vanek" in low and current_date and current_shift:
-            key = (current_date, current_shift)
-            if key not in seen:
-                seen.add(key)
-                result.append({"date": current_date, "shift": current_shift, "source_name": source_name})
-    return result
+        if "jan vanek" in low and current_date:
+            accepted = current_shift == "odpoledni"
+            diagnostics.append({
+                "token": line[:180],
+                "date": current_date,
+                "decision": current_shift or "nezname",
+                "accepted": accepted,
+                "reason": "Textový fallback: poslední rozpoznaná hlavička směny je odpolední." if accepted
+                          else "Textový fallback: jméno nebylo pod odpolední hlavičkou.",
+            })
+            if accepted and current_date not in seen:
+                seen.add(current_date)
+                result.append({"date": current_date, "shift": "odpoledni", "source_name": source_name})
+    return result, diagnostics
 
 
 def _work_norm_token(value):
@@ -648,7 +690,6 @@ def _work_norm_token(value):
 
 
 def _work_parse_date_token(value):
-    # Tesseract frequently removes dots from dates, therefore parse digits too.
     digits = re.sub(r"\D", "", str(value or ""))
     if len(digits) not in {7, 8}:
         return None
@@ -665,7 +706,7 @@ def _work_parse_date_token(value):
 
 
 def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
-    """OCR one screenshot region and return word boxes mapped to original pixels."""
+    """OCR jednoho výřezu; souřadnice vrací zpět v pixelech původního screenshotu."""
     with Image.open(image_path) as source:
         source = source.convert("L")
         width, height = source.size
@@ -678,7 +719,6 @@ def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
         else:
             x1, y1, x2, y2 = 0, 0, width, height
         region = source.crop((x1, y1, x2, y2))
-        # Tiny spreadsheet text needs upscaling, but cap output size for Raspberry Pi.
         scale = min(float(requested_scale), max(1.0, 6500.0 / max(1, region.width)))
         target = (max(1, int(region.width * scale)), max(1, int(region.height * scale)))
         if target != region.size:
@@ -704,6 +744,7 @@ def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
             continue
         try:
             left, top, word_w, word_h = map(int, parts[6:10])
+            confidence = float(parts[10])
         except ValueError:
             continue
         words.append({
@@ -712,6 +753,7 @@ def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
             "top": y1 + top / scale,
             "width": word_w / scale,
             "height": word_h / scale,
+            "ocr_confidence": confidence,
         })
     return words
 
@@ -764,6 +806,7 @@ def _work_row_model(date_words):
         "spacing": float(spacing),
         "day1_y": float(intercept),
         "days": calendar.monthrange(year, month)[1],
+        "date_points": len(inliers),
     }
 
 
@@ -778,56 +821,150 @@ def _work_name_candidates(words):
         y1 = word["top"] + word["height"] / 2
         y2 = nxt["top"] + nxt["height"] / 2
         gap = nxt["left"] - (word["left"] + word["width"])
-        if abs(y1 - y2) <= max(3.0, word["height"], nxt["height"]) and -2 <= gap <= 18:
+        if abs(y1 - y2) <= max(3.0, word["height"], nxt["height"]) and -2 <= gap <= 20:
             result.append({
-                "text": word["text"] + nxt["text"],
+                "text": word["text"] + " " + nxt["text"],
                 "left": word["left"],
                 "top": min(word["top"], nxt["top"]),
                 "width": max(word["left"] + word["width"], nxt["left"] + nxt["width"]) - word["left"],
                 "height": max(word["top"] + word["height"], nxt["top"] + nxt["height"]) - min(word["top"], nxt["top"]),
+                "ocr_confidence": min(word.get("ocr_confidence", 0), nxt.get("ocr_confidence", 0)),
             })
     return result
 
 
-def _work_extract_shifts(words, model, source_name, image_width, forced_shift=None):
+def _work_vertical_boundary(image_path, y1, y2, lo_ratio, hi_ratio, default_ratio):
+    """Najde svislý oddělovač tabulky nejblíž očekávané hranici sekce."""
+    with Image.open(image_path) as image:
+        gray = image.convert("L")
+        width, height = gray.size
+        top = max(0, min(height - 1, int(y1)))
+        bottom = max(top + 1, min(height, int(y2)))
+        lo = max(0, int(width * lo_ratio))
+        hi = min(width - 1, int(width * hi_ratio))
+        pixels = gray.load()
+        step_y = max(1, int((bottom - top) / 260))
+        scores = []
+        for x in range(lo, hi + 1):
+            score = 0
+            for y in range(top, bottom, step_y):
+                # Google Sheets kreslí některé silné oddělovače tmavě šedě,
+                # proto je limit schválně vyšší než u OCR textu.
+                if pixels[x, y] < 125:
+                    score += 1
+            scores.append((x, score))
+        if not scores:
+            return int(width * default_ratio)
+        peak = max(score for _, score in scores)
+        strong = [(x, score) for x, score in scores if score >= max(12, peak * 0.72)]
+        if not strong:
+            return int(width * default_ratio)
+        expected = width * default_ratio
+        return min(strong, key=lambda item: (abs(item[0] - expected), -item[1]))[0]
+
+
+def _work_extract_afternoons(words, model, source_name, image_width, region_left, region_right):
     target = "janvanek"
-    found = {}
     spacing = model["spacing"]
+    found = {}
+    diagnostics = []
     for word in _work_name_candidates(words):
         token = _work_norm_token(word.get("text"))
-        if len(token) < 6:
+        if len(token) < 5:
             continue
-        score = difflib.SequenceMatcher(None, token, target).ratio()
-        if score < 0.72:
+        similarity = difflib.SequenceMatcher(None, token, target).ratio()
+        if similarity < 0.48:
             continue
+        center_x = float(word["left"]) + float(word["width"]) / 2
         center_y = float(word["top"]) + float(word["height"]) / 2
         day = int(round((center_y - model["day1_y"]) / spacing)) + 1
-        if not 1 <= day <= model["days"]:
-            continue
         expected_y = model["day1_y"] + spacing * (day - 1)
-        if abs(center_y - expected_y) > max(3.0, spacing * 0.52):
+        y_delta = abs(center_y - expected_y)
+        inside = region_left <= center_x <= region_right
+        valid_day = 1 <= day <= model["days"]
+        aligned = valid_day and y_delta <= max(3.0, spacing * 0.52)
+        accepted = similarity >= 0.72 and inside and aligned
+        reason_parts = []
+        if not inside:
+            reason_parts.append("mimo blok odpolední směny")
+        if similarity < 0.72:
+            reason_parts.append("jméno se málo podobá Jan Vaněk")
+        if not aligned:
+            reason_parts.append("nesedí na řádek data")
+        if accepted:
+            reason_parts.append("jméno je v bloku odpolední směny a sedí na řádek data")
+        diagnostics.append({
+            "token": word.get("text", "")[:120],
+            "similarity": round(similarity * 100, 1),
+            "ocr_confidence": round(float(word.get("ocr_confidence", 0)), 1),
+            "x": round(center_x, 1),
+            "x_percent": round(center_x / max(1.0, float(image_width)) * 100, 1),
+            "row_day": day if valid_day else None,
+            "y_delta": round(y_delta, 1) if valid_day else None,
+            "decision": "odpoledni" if accepted else "odmitnuto",
+            "accepted": accepted,
+            "reason": "; ".join(reason_parts),
+        })
+        if not accepted:
             continue
-        shift = forced_shift
-        if not shift:
-            center_x = float(word["left"]) + float(word["width"]) / 2
-            ratio = center_x / max(1.0, float(image_width))
-            if ratio < 0.61:
-                shift = "dopoledni"
-            elif ratio < 0.87:
-                shift = "odpoledni"
-            else:
-                continue
         work_date = date(model["year"], model["month"], day).isoformat()
-        key = (work_date, shift)
-        previous = found.get(key)
-        if previous is None or score > previous["confidence"]:
-            found[key] = {
+        previous = found.get(work_date)
+        if previous is None or similarity > previous["score"]:
+            found[work_date] = {
                 "date": work_date,
-                "shift": shift,
+                "shift": "odpoledni",
                 "source_name": source_name,
-                "confidence": round(score, 3),
+                "score": similarity,
+                "evidence": {
+                    "token": word.get("text", "")[:120],
+                    "similarity": round(similarity * 100, 1),
+                    "x_percent": round(center_x / max(1.0, float(image_width)) * 100, 1),
+                    "reason": "Jméno bylo rozpoznáno uvnitř odpoledního bloku a na řádku tohoto data.",
+                },
             }
-    return list(found.values())
+    # Pro log necháme jako "přijatý" právě jeden nejlepší důkaz pro každý den.
+    best_diag = {}
+    for index, diagnostic in enumerate(diagnostics):
+        if not diagnostic.get("accepted") or not diagnostic.get("row_day"):
+            continue
+        day = diagnostic["row_day"]
+        if day not in best_diag or diagnostic.get("similarity", 0) > diagnostics[best_diag[day]].get("similarity", 0):
+            best_diag[day] = index
+    selected_indexes = set(best_diag.values())
+    for index, diagnostic in enumerate(diagnostics):
+        if diagnostic.get("accepted") and index not in selected_indexes:
+            diagnostic["accepted"] = False
+            diagnostic["decision"] = "duplicitni_kandidat"
+            diagnostic["reason"] = "Stejný den už má přesnější OCR důkaz pro Jana Vaňka."
+
+    shifts = []
+    for item in sorted(found.values(), key=lambda row: row["date"]):
+        item.pop("score", None)
+        shifts.append(item)
+    return shifts, diagnostics
+
+
+def _save_work_scan_log(source_name, width, height, model, region_left, region_right, diagnostics, ocr_text):
+    with db() as conn:
+        cur = conn.execute(
+            """INSERT INTO work_scan_logs
+               (source_name,image_width,image_height,month,year,region_left,region_right,detected_count,diagnostics_json,ocr_text)
+               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            (
+                source_name,
+                int(width or 0),
+                int(height or 0),
+                model.get("month") if model else None,
+                model.get("year") if model else None,
+                float(region_left) if region_left is not None else None,
+                float(region_right) if region_right is not None else None,
+                sum(1 for row in diagnostics if row.get("accepted")),
+                json.dumps(diagnostics[:250], ensure_ascii=False),
+                str(ocr_text or "")[:30000],
+            ),
+        )
+        conn.commit()
+        return cur.lastrowid
 
 
 def _scan_work_image(image_path, source_name):
@@ -835,35 +972,42 @@ def _scan_work_image(image_path, source_name):
         width, height = image.size
     date_words = _work_ocr_words(
         image_path,
-        (0, 0, max(120, int(width * 0.18)), height),
-        requested_scale=4.0,
+        (0, 0, max(120, int(width * 0.12)), height),
+        requested_scale=4.2,
         psm=6,
     )
     model = _work_row_model(date_words)
     if not model:
-        return [], "Nepodařilo se spolehlivě určit řádky s daty."
+        return [], [], "", {"width": width, "height": height, "model": None, "left": None, "right": None}
 
-    top = max(0, int(model["day1_y"] - model["spacing"] * 3))
+    top = max(0, int(model["day1_y"] - model["spacing"] * 2.5))
     bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
-    passes = [
-        ((int(width * 0.01), top, int(width * 0.88), bottom), 3.0, None),
-        ((int(width * 0.04), top, int(width * 0.615), bottom), 4.0, "dopoledni"),
-        ((int(width * 0.59), top, int(width * 0.87), bottom), 4.0, "odpoledni"),
-    ]
-    all_found = {}
-    debug_words = []
-    for crop, scale, forced_shift in passes:
-        words = _work_ocr_words(image_path, crop, requested_scale=scale, psm=6)
-        debug_words.extend(word["text"] for word in words)
-        for row in _work_extract_shifts(words, model, source_name, width, forced_shift):
-            key = (row["date"], row["shift"])
-            previous = all_found.get(key)
-            if previous is None or row["confidence"] > previous["confidence"]:
-                all_found[key] = row
-    result = sorted(all_found.values(), key=lambda row: (row["date"], row["shift"]))
-    for row in result:
-        row.pop("confidence", None)
-    return result, " ".join(debug_words)[:30000]
+    left = _work_vertical_boundary(image_path, top, bottom, 0.54, 0.68, 0.615)
+    right = _work_vertical_boundary(image_path, top, bottom, 0.81, 0.93, 0.863)
+    if right <= left + width * 0.08:
+        left, right = int(width * 0.615), int(width * 0.863)
+
+    # Odpolední blok má v používané tabulce čtyři stejně široké sloupce.
+    # OCR po jednotlivých sloupcích výrazně omezuje rušení svislými čarami.
+    span = right - left
+    words = []
+    for column in range(4):
+        x1 = left + round(span * column / 4) + 3
+        x2 = left + round(span * (column + 1) / 4) - 3
+        if x2 <= x1:
+            continue
+        words.extend(_work_ocr_words(image_path, (x1, top, x2, bottom), requested_scale=6.0, psm=6))
+    # Jeden společný průchod zachytí případy, kdy OCR rozdělí jméno netypicky.
+    words.extend(_work_ocr_words(
+        image_path,
+        (min(width - 2, left + 2), top, max(left + 4, right - 2), bottom),
+        requested_scale=4.3,
+        psm=6,
+    ))
+    shifts, diagnostics = _work_extract_afternoons(words, model, source_name, width, left, right)
+    debug_text = " ".join(word["text"] for word in words)[:30000]
+    meta = {"width": width, "height": height, "model": model, "left": left, "right": right}
+    return shifts, diagnostics, debug_text, meta
 
 
 def scan_work(original_name, body):
@@ -889,23 +1033,59 @@ def scan_work(original_name, body):
                 raise ValueError("PDF se nepodařilo převést na obrázek.")
             image_path = rendered
         try:
-            shifts, debug_text = _scan_work_image(image_path, source_name)
+            shifts, diagnostics, debug_text, meta = _scan_work_image(image_path, source_name)
         except (OSError, ValueError, subprocess.SubprocessError):
-            shifts, debug_text = [], ""
-        if shifts:
-            return {"ocr_text": debug_text, "shifts": shifts}
+            shifts, diagnostics, debug_text = [], [], ""
+            with Image.open(image_path) as image:
+                meta = {"width": image.width, "height": image.height, "model": None, "left": None, "right": None}
 
-        # Keep a generic fallback for other layouts and text-like PDFs.
-        try:
-            text = ocr_file(source, mime)
-        except Exception:
-            raise ValueError("Screenshot se nepodařilo přečíst.")
-        fallback = parse_work_text(text, source_name)
-        return {"ocr_text": text[:30000], "shifts": fallback}
+        if not shifts:
+            try:
+                text = ocr_file(source, mime)
+            except Exception:
+                text = ""
+            fallback, fallback_diag = parse_work_text(text, source_name)
+            if fallback:
+                shifts = fallback
+                diagnostics.extend(fallback_diag)
+                debug_text = text[:30000]
+
+        scan_id = _save_work_scan_log(
+            source_name,
+            meta.get("width"),
+            meta.get("height"),
+            meta.get("model"),
+            meta.get("left"),
+            meta.get("right"),
+            diagnostics,
+            debug_text,
+        )
+        for shift in shifts:
+            shift["scan_id"] = scan_id
+        accepted_diagnostics = [row for row in diagnostics if row.get("accepted")]
+        return {
+            "scan_id": scan_id,
+            "ocr_text": debug_text,
+            "shifts": shifts,
+            "diagnostics": diagnostics,
+            "summary": {
+                "month": meta.get("model", {}).get("month") if meta.get("model") else None,
+                "year": meta.get("model", {}).get("year") if meta.get("model") else None,
+                "afternoon_detected": len(shifts),
+                "candidates_accepted": len(accepted_diagnostics),
+                "region_left_percent": round(meta["left"] / meta["width"] * 100, 1) if meta.get("left") is not None and meta.get("width") else None,
+                "region_right_percent": round(meta["right"] / meta["width"] * 100, 1) if meta.get("right") is not None and meta.get("width") else None,
+            },
+        }
 
 
 def commit_work(payload):
     shifts = payload.get("shifts") or []
+    scan_id = payload.get("scan_id")
+    try:
+        scan_id = int(scan_id) if scan_id else None
+    except (TypeError, ValueError):
+        scan_id = None
     added = 0
     accepted = []
     with db() as conn:
@@ -913,30 +1093,44 @@ def commit_work(payload):
             if not isinstance(row, dict):
                 continue
             day = _clean(row.get("date"), 10)
-            shift = _clean(row.get("shift"), 20)
-            if shift not in SHIFT_VALUES or not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
+            # Pracovní kalendář od 1.0.3 ukládá výhradně odpolední směny.
+            shift = "odpoledni"
+            if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", day):
                 continue
-            cur = conn.execute("INSERT OR IGNORE INTO work_shifts(work_date,shift,source_name) VALUES(?,?,?)",
-                               (day, shift, _clean(row.get("source_name"), 180)))
-            added += cur.rowcount
-            accepted.append((day, shift))
+            cur = conn.execute(
+                """INSERT INTO work_shifts(work_date,shift,source_name,scan_id) VALUES(?,?,?,?)
+                   ON CONFLICT(work_date,shift) DO UPDATE SET
+                     source_name=excluded.source_name,scan_id=COALESCE(excluded.scan_id,work_shifts.scan_id)""",
+                (day, shift, _clean(row.get("source_name"), 180), scan_id or row.get("scan_id")),
+            )
+            added += max(0, cur.rowcount)
+            accepted.append(day)
         conn.commit()
-    # Work shifts are also real calendar events. Keep the import idempotent.
+
+    # Zachováme propojení s hlavním kalendářem, ale pouze jako odpolední 14:00–22:00.
     calendar_path = "/data/calendar.db"
     if accepted and Path(calendar_path).exists():
         with sqlite3.connect(calendar_path, timeout=10) as conn:
-            for day, shift in accepted:
-                title = "Práce – dopolední" if shift == "dopoledni" else "Práce – odpolední"
+            for day in accepted:
+                title = "Práce – odpolední"
                 marker = "Automaticky importováno ze směn Jan Vaněk."
-                exists = conn.execute(
-                    "SELECT 1 FROM events WHERE calendar='hanych' AND start_date=? AND title=? AND notes=? LIMIT 1",
+                existing = conn.execute(
+                    "SELECT id FROM events WHERE start_date=? AND title=? AND notes=? LIMIT 1",
                     (day, title, marker),
                 ).fetchone()
-                if not exists:
-                    conn.execute("""INSERT INTO events
-                      (title,calendar,start_date,end_date,start_time,end_time,all_day,location,notes,recurrence,event_type)
-                      VALUES(?,?,?,?,?,?,?,?,?,'none','')""",
-                      (title, "hanych", day, day, "", "", 1, "", marker))
+                if existing:
+                    conn.execute(
+                        """UPDATE events SET calendar='hanych',end_date=?,start_time='14:00',end_time='22:00',
+                           all_day=0,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                        (day, existing[0]),
+                    )
+                else:
+                    conn.execute(
+                        """INSERT INTO events
+                          (title,calendar,start_date,end_date,start_time,end_time,all_day,location,notes,recurrence,event_type)
+                          VALUES(?,?,?,?,?,?,?,?,?,'none','')""",
+                        (title, "hanych", day, day, "14:00", "22:00", 0, "", marker),
+                    )
             conn.commit()
     return {"added": added, "shifts": work_shifts()}
 
@@ -945,8 +1139,36 @@ def work_shifts(start=None, end=None):
     start = start or (date.today() - timedelta(days=40)).isoformat()
     end = end or (date.today() + timedelta(days=120)).isoformat()
     with db() as conn:
-        rows = conn.execute("SELECT * FROM work_shifts WHERE work_date BETWEEN ? AND ? ORDER BY work_date,shift", (start, end)).fetchall()
+        rows = conn.execute(
+            """SELECT * FROM work_shifts
+               WHERE work_date BETWEEN ? AND ? AND shift='odpoledni'
+               ORDER BY work_date""",
+            (start, end),
+        ).fetchall()
     return [dict(r) for r in rows]
+
+
+def work_scan_logs(limit=10):
+    limit = max(1, min(int(limit or 10), 30))
+    with db() as conn:
+        rows = conn.execute(
+            """SELECT id,source_name,image_width,image_height,month,year,region_left,region_right,
+                      detected_count,diagnostics_json,created_at
+               FROM work_scan_logs ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    result = []
+    for row in rows:
+        item = dict(row)
+        try:
+            item["diagnostics"] = json.loads(item.pop("diagnostics_json") or "[]")
+        except Exception:
+            item["diagnostics"] = []
+        if item.get("image_width"):
+            item["region_left_percent"] = round((item.get("region_left") or 0) / item["image_width"] * 100, 1)
+            item["region_right_percent"] = round((item.get("region_right") or 0) / item["image_width"] * 100, 1)
+        result.append(item)
+    return result
 
 
 def _budget_dashboard():
