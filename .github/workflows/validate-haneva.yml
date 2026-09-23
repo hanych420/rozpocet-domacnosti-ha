@@ -34,3 +34,20 @@ jobs:
           PY
       - name: Build add-on image
         run: docker build haneva_home -t haneva-home-validation
+      - name: Smoke-test 1.0 backend
+        run: |
+          docker run --rm --entrypoint python3 haneva-home-validation -c '
+          import shopping, v1_features
+          shopping.init_db()
+          v1_features.init_db()
+          recipe=v1_features.create_recipe({"title":"CI recept","ingredients":"2 ks cibule\n500 g rajčata"})
+          assert recipe["title"]=="CI recept" and len(recipe["ingredients"])==2
+          assert v1_features.vote_recipe(recipe["id"],"hanych","like")["matched"] is False
+          assert v1_features.vote_recipe(recipe["id"],"eva","like")["matched"] is True
+          assert len(v1_features.planned_state()["planned"])==1
+          preview=v1_features.shopping_preview()
+          assert len(preview["items"])==2
+          wish=v1_features.save_wishlist({"title":"CI přání","price":"999","priority":2})
+          assert wish["title"]=="CI přání"
+          print("Haneva 1.0 smoke test OK")
+          '
