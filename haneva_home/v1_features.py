@@ -2,6 +2,7 @@ from datetime import date, datetime, timedelta, timezone
 from http.client import HTTPConnection
 from pathlib import Path
 import calendar
+import difflib
 import json
 import os
 import re
@@ -10,6 +11,10 @@ import sqlite3
 import subprocess
 import tempfile
 import unicodedata
+from collections import Counter
+from statistics import median
+
+from PIL import Image, ImageEnhance, ImageFilter
 import uuid
 
 import shopping
@@ -614,6 +619,7 @@ def receipt_list(limit=30):
 
 
 def parse_work_text(text, source_name=""):
+    """Fallback for text-like exports. Screenshot parsing uses coordinates below."""
     lines = [_clean(x, 300) for x in str(text or "").splitlines() if _clean(x)]
     result, seen = [], set()
     current_date = None
@@ -635,18 +641,267 @@ def parse_work_text(text, source_name=""):
     return result
 
 
+def _work_norm_token(value):
+    value = unicodedata.normalize("NFKD", str(value or "").lower())
+    value = "".join(ch for ch in value if not unicodedata.combining(ch))
+    return re.sub(r"[^a-z0-9]+", "", value)
+
+
+def _work_parse_date_token(value):
+    # Tesseract frequently removes dots from dates, therefore parse digits too.
+    digits = re.sub(r"\D", "", str(value or ""))
+    if len(digits) not in {7, 8}:
+        return None
+    try:
+        year = int(digits[-4:])
+        month = int(digits[-6:-4])
+        day = int(digits[:-6])
+        parsed = date(year, month, day)
+    except (ValueError, TypeError):
+        return None
+    if not 2020 <= parsed.year <= 2100:
+        return None
+    return parsed
+
+
+def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
+    """OCR one screenshot region and return word boxes mapped to original pixels."""
+    with Image.open(image_path) as source:
+        source = source.convert("L")
+        width, height = source.size
+        if crop_box:
+            x1, y1, x2, y2 = crop_box
+            x1 = max(0, min(width - 1, int(x1)))
+            y1 = max(0, min(height - 1, int(y1)))
+            x2 = max(x1 + 1, min(width, int(x2)))
+            y2 = max(y1 + 1, min(height, int(y2)))
+        else:
+            x1, y1, x2, y2 = 0, 0, width, height
+        region = source.crop((x1, y1, x2, y2))
+        # Tiny spreadsheet text needs upscaling, but cap output size for Raspberry Pi.
+        scale = min(float(requested_scale), max(1.0, 6500.0 / max(1, region.width)))
+        target = (max(1, int(region.width * scale)), max(1, int(region.height * scale)))
+        if target != region.size:
+            region = region.resize(target, Image.Resampling.LANCZOS)
+        region = ImageEnhance.Contrast(region).enhance(1.8)
+        region = region.filter(ImageFilter.SHARPEN)
+        with tempfile.NamedTemporaryFile(prefix="haneva-work-ocr-", suffix=".png") as temp_image:
+            region.save(temp_image.name, "PNG")
+            proc = subprocess.run(
+                ["tesseract", temp_image.name, "stdout", "-l", "ces", "--psm", str(psm), "tsv"],
+                capture_output=True,
+                timeout=55,
+            )
+    if proc.returncode != 0:
+        return []
+    words = []
+    for raw_line in proc.stdout.decode("utf-8", "replace").splitlines():
+        parts = raw_line.split("\t")
+        if len(parts) < 12 or parts[0] != "5":
+            continue
+        text = "\t".join(parts[11:]).strip()
+        if not text:
+            continue
+        try:
+            left, top, word_w, word_h = map(int, parts[6:10])
+        except ValueError:
+            continue
+        words.append({
+            "text": text,
+            "left": x1 + left / scale,
+            "top": y1 + top / scale,
+            "width": word_w / scale,
+            "height": word_h / scale,
+        })
+    return words
+
+
+def _work_row_model(date_words):
+    points = []
+    month_year = Counter()
+    for word in date_words:
+        parsed = _work_parse_date_token(word.get("text"))
+        if not parsed:
+            continue
+        y = float(word["top"]) + float(word["height"]) / 2
+        points.append((parsed.day, parsed.month, parsed.year, y))
+        month_year[(parsed.month, parsed.year)] += 1
+    if not month_year:
+        return None
+    (month, year), count = month_year.most_common(1)[0]
+    if count < 5:
+        return None
+    rows = [(day, y) for day, m, yyear, y in points if m == month and yyear == year]
+    slopes = []
+    for index, (day_a, y_a) in enumerate(rows):
+        for day_b, y_b in rows[index + 1:]:
+            if day_a == day_b:
+                continue
+            slope = (y_b - y_a) / (day_b - day_a)
+            if 3.0 < slope < 80.0:
+                slopes.append(slope)
+    if not slopes:
+        return None
+    spacing = median(slopes)
+    intercept = median([y - spacing * (day - 1) for day, y in rows])
+    tolerance = max(2.0, spacing * 0.46)
+    inliers = [(day, y) for day, y in rows if abs(y - (intercept + spacing * (day - 1))) <= tolerance]
+    if len(inliers) >= 5:
+        refined = []
+        for index, (day_a, y_a) in enumerate(inliers):
+            for day_b, y_b in inliers[index + 1:]:
+                if day_a == day_b:
+                    continue
+                slope = (y_b - y_a) / (day_b - day_a)
+                if 3.0 < slope < 80.0:
+                    refined.append(slope)
+        if refined:
+            spacing = median(refined)
+            intercept = median([y - spacing * (day - 1) for day, y in inliers])
+    return {
+        "month": month,
+        "year": year,
+        "spacing": float(spacing),
+        "day1_y": float(intercept),
+        "days": calendar.monthrange(year, month)[1],
+    }
+
+
+def _work_name_candidates(words):
+    ordered = sorted(words, key=lambda w: (round((w["top"] + w["height"] / 2) / 3), w["left"]))
+    result = []
+    for index, word in enumerate(ordered):
+        result.append(word)
+        if index + 1 >= len(ordered):
+            continue
+        nxt = ordered[index + 1]
+        y1 = word["top"] + word["height"] / 2
+        y2 = nxt["top"] + nxt["height"] / 2
+        gap = nxt["left"] - (word["left"] + word["width"])
+        if abs(y1 - y2) <= max(3.0, word["height"], nxt["height"]) and -2 <= gap <= 18:
+            result.append({
+                "text": word["text"] + nxt["text"],
+                "left": word["left"],
+                "top": min(word["top"], nxt["top"]),
+                "width": max(word["left"] + word["width"], nxt["left"] + nxt["width"]) - word["left"],
+                "height": max(word["top"] + word["height"], nxt["top"] + nxt["height"]) - min(word["top"], nxt["top"]),
+            })
+    return result
+
+
+def _work_extract_shifts(words, model, source_name, image_width, forced_shift=None):
+    target = "janvanek"
+    found = {}
+    spacing = model["spacing"]
+    for word in _work_name_candidates(words):
+        token = _work_norm_token(word.get("text"))
+        if len(token) < 6:
+            continue
+        score = difflib.SequenceMatcher(None, token, target).ratio()
+        if score < 0.72:
+            continue
+        center_y = float(word["top"]) + float(word["height"]) / 2
+        day = int(round((center_y - model["day1_y"]) / spacing)) + 1
+        if not 1 <= day <= model["days"]:
+            continue
+        expected_y = model["day1_y"] + spacing * (day - 1)
+        if abs(center_y - expected_y) > max(3.0, spacing * 0.52):
+            continue
+        shift = forced_shift
+        if not shift:
+            center_x = float(word["left"]) + float(word["width"]) / 2
+            ratio = center_x / max(1.0, float(image_width))
+            if ratio < 0.61:
+                shift = "dopoledni"
+            elif ratio < 0.87:
+                shift = "odpoledni"
+            else:
+                continue
+        work_date = date(model["year"], model["month"], day).isoformat()
+        key = (work_date, shift)
+        previous = found.get(key)
+        if previous is None or score > previous["confidence"]:
+            found[key] = {
+                "date": work_date,
+                "shift": shift,
+                "source_name": source_name,
+                "confidence": round(score, 3),
+            }
+    return list(found.values())
+
+
+def _scan_work_image(image_path, source_name):
+    with Image.open(image_path) as image:
+        width, height = image.size
+    date_words = _work_ocr_words(
+        image_path,
+        (0, 0, max(120, int(width * 0.18)), height),
+        requested_scale=4.0,
+        psm=6,
+    )
+    model = _work_row_model(date_words)
+    if not model:
+        return [], "Nepodařilo se spolehlivě určit řádky s daty."
+
+    top = max(0, int(model["day1_y"] - model["spacing"] * 3))
+    bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
+    passes = [
+        ((int(width * 0.01), top, int(width * 0.88), bottom), 3.0, None),
+        ((int(width * 0.04), top, int(width * 0.615), bottom), 4.0, "dopoledni"),
+        ((int(width * 0.59), top, int(width * 0.87), bottom), 4.0, "odpoledni"),
+    ]
+    all_found = {}
+    debug_words = []
+    for crop, scale, forced_shift in passes:
+        words = _work_ocr_words(image_path, crop, requested_scale=scale, psm=6)
+        debug_words.extend(word["text"] for word in words)
+        for row in _work_extract_shifts(words, model, source_name, width, forced_shift):
+            key = (row["date"], row["shift"])
+            previous = all_found.get(key)
+            if previous is None or row["confidence"] > previous["confidence"]:
+                all_found[key] = row
+    result = sorted(all_found.values(), key=lambda row: (row["date"], row["shift"]))
+    for row in result:
+        row.pop("confidence", None)
+    return result, " ".join(debug_words)[:30000]
+
+
 def scan_work(original_name, body):
     if not body or len(body) > MAX_UPLOAD:
         raise ValueError("Screenshot může mít nejvýše 18 MB.")
     mime, suffix = detect_upload_type(body)
+    source_name = Path(original_name or "smeny").name[:180]
     with tempfile.TemporaryDirectory(prefix="haneva-work-") as temp:
-        path = Path(temp) / ("work" + suffix)
-        path.write_bytes(body)
+        source = Path(temp) / ("work" + suffix)
+        source.write_bytes(body)
+        image_path = source
+        if mime == "application/pdf":
+            rendered = Path(temp) / "work-page.png"
+            try:
+                subprocess.run(
+                    ["pdftoppm", "-singlefile", "-png", "-r", "180", str(source), str(rendered.with_suffix(""))],
+                    check=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    timeout=55,
+                )
+            except (OSError, subprocess.SubprocessError):
+                raise ValueError("PDF se nepodařilo převést na obrázek.")
+            image_path = rendered
         try:
-            text = ocr_file(path, mime)
+            shifts, debug_text = _scan_work_image(image_path, source_name)
+        except (OSError, ValueError, subprocess.SubprocessError):
+            shifts, debug_text = [], ""
+        if shifts:
+            return {"ocr_text": debug_text, "shifts": shifts}
+
+        # Keep a generic fallback for other layouts and text-like PDFs.
+        try:
+            text = ocr_file(source, mime)
         except Exception:
             raise ValueError("Screenshot se nepodařilo přečíst.")
-    return {"ocr_text": text[:30000], "shifts": parse_work_text(text, Path(original_name or "smeny").name[:180])}
+        fallback = parse_work_text(text, source_name)
+        return {"ocr_text": text[:30000], "shifts": fallback}
 
 
 def commit_work(payload):
