@@ -49,12 +49,54 @@ BUDGET_HOME_HTML = """
 """
 
 
+BUDGET_RECEIPT_PREFILL = """
+<style id="haneva-receipt-prefill-style">
+#haneva-receipt-prefill{position:fixed;z-index:99999;left:50%;bottom:18px;transform:translateX(-50%);max-width:min(92vw,520px);background:#111827;color:#fff;border-radius:14px;padding:11px 14px;font:700 13px/1.35 Inter,system-ui,sans-serif;box-shadow:0 18px 55px rgba(17,24,39,.30);display:none}
+</style>
+<div id="haneva-receipt-prefill"></div>
+<script id="haneva-receipt-prefill-script">
+(function(){
+  var p=new URLSearchParams(location.search),amount=p.get('receipt_amount');
+  if(!amount)return;
+  var store=p.get('receipt_store')||'',date=p.get('receipt_date')||'';
+  function meta(el){
+    var t=[el.name,el.id,el.placeholder,el.getAttribute('aria-label')].filter(Boolean).join(' ');
+    if(el.id){var l=document.querySelector('label[for="'+CSS.escape(el.id)+'"]');if(l)t+=' '+l.textContent}
+    var parent=el.closest('label,.field,.form-group,.row');if(parent)t+=' '+parent.textContent.slice(0,120);
+    return t.normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').toLowerCase();
+  }
+  function set(el,val){
+    if(!el||!val)return false;
+    el.value=(el.type==='number'?String(val).replace(',','.') : val);
+    el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;
+  }
+  function find(keys){
+    var inputs=[].slice.call(document.querySelectorAll('input:not([type=hidden]),textarea'));
+    return inputs.find(function(el){var m=meta(el);return keys.some(function(k){return m.indexOf(k)>=0})});
+  }
+  function apply(){
+    var amountEl=find(['castka','částka','amount','cena','price']);
+    if(!amountEl)return false;
+    set(amountEl,amount);
+    var storeEl=find(['obchod','popis','description','merchant','poznamka','poznámka']);if(store)set(storeEl,store);
+    var dateEl=find(['datum','date']);if(date&&dateEl)set(dateEl,date);
+    var box=document.getElementById('haneva-receipt-prefill');if(box){box.textContent='✓ Účtenka načtena: '+Number(String(amount).replace(',','.')).toLocaleString('cs-CZ')+' Kč'+(store?' · '+store:'')+'. Zkontroluj a ulož.';box.style.display='block';setTimeout(function(){box.style.display='none'},5500)}
+    return true;
+  }
+  var tries=0,t=setInterval(function(){tries++;if(apply()||tries>25)clearInterval(t)},200);
+  document.addEventListener('click',function(){setTimeout(apply,80)},true);
+})();
+</script>
+"""
+
+
 def add_budget_home_link(text):
     lower = text.lower()
     if "<body" not in lower or "</head>" not in lower or "haneva-budget-homebar" in text:
         return text
     text = re.sub(r"</head>", BUDGET_HOME_CSS + "</head>", text, count=1, flags=re.IGNORECASE)
     text = re.sub(r"(<body\b[^>]*>)", r"\1" + BUDGET_HOME_HTML, text, count=1, flags=re.IGNORECASE)
+    text = re.sub(r"</body>", BUDGET_RECEIPT_PREFILL + "</body>", text, count=1, flags=re.IGNORECASE)
     return text
 
 
