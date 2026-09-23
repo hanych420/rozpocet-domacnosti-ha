@@ -834,7 +834,7 @@ def _work_name_candidates(words):
 
 
 def _work_vertical_boundary(image_path, y1, y2, lo_ratio, hi_ratio, default_ratio):
-    """Najde silnou svislou čáru oddělující bloky tabulky; jinak použije poměr."""
+    """Najde svislý oddělovač tabulky nejblíž očekávané hranici sekce."""
     with Image.open(image_path) as image:
         gray = image.convert("L")
         width, height = gray.size
@@ -843,16 +843,24 @@ def _work_vertical_boundary(image_path, y1, y2, lo_ratio, hi_ratio, default_rati
         lo = max(0, int(width * lo_ratio))
         hi = min(width - 1, int(width * hi_ratio))
         pixels = gray.load()
-        best_x, best_score = int(width * default_ratio), -1
         step_y = max(1, int((bottom - top) / 260))
+        scores = []
         for x in range(lo, hi + 1):
             score = 0
             for y in range(top, bottom, step_y):
-                if pixels[x, y] < 75:
+                # Google Sheets kreslí některé silné oddělovače tmavě šedě,
+                # proto je limit schválně vyšší než u OCR textu.
+                if pixels[x, y] < 125:
                     score += 1
-            if score > best_score:
-                best_x, best_score = x, score
-    return best_x
+            scores.append((x, score))
+        if not scores:
+            return int(width * default_ratio)
+        peak = max(score for _, score in scores)
+        strong = [(x, score) for x, score in scores if score >= max(12, peak * 0.72)]
+        if not strong:
+            return int(width * default_ratio)
+        expected = width * default_ratio
+        return min(strong, key=lambda item: (abs(item[0] - expected), -item[1]))[0]
 
 
 def _work_extract_afternoons(words, model, source_name, image_width, region_left, region_right):
