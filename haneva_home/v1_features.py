@@ -16,6 +16,7 @@ import unicodedata
 import uuid
 
 import requests
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 import shopping
 
 DB_PATH = "/data/haneva_v1.db"
@@ -1019,84 +1020,169 @@ def _tesseract_tsv(path):
     return rows
 
 
-def _scan_work_image(path, year_hint=None):
-    words = _tesseract_tsv(path)
-    year = None
-    for word in words:
-        m = re.search(r"\b(20\d{2})\b", word["text"])
-        if m:
-            year = int(m.group(1)); break
-    year = year or (int(year_hint) if year_hint else date.today().year)
-
-    dates = []
-    for word in words:
-        text = word["text"].replace(" ", "")
-        m = re.search(r"\b([0-3]?\d)[./]([01]?\d)[./]?", text)
-        if not m:
-            continue
-        day, month = int(m.group(1)), int(m.group(2))
+def _work_date_from_text(text, fallback_year):
+    raw = clean(text, 80)
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 8:
         try:
-            d = date(year, month, day)
+            day, month, year = int(digits[:2]), int(digits[2:4]), int(digits[4:])
+            return date(year, month, day)
         except ValueError:
+            pass
+    m = re.search(r"\b([0-3]?\d)\D+([01]?\d)\D+(20\d{2})\b", raw)
+    if m:
+        try:
+            return date(int(m.group(3)), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            pass
+    m = re.search(r"\b([0-3]?\d)\D+([01]?\d)\b", raw)
+    if m:
+        try:
+            return date(int(fallback_year), int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            pass
+    return None
+
+
+def _work_name_score(text):
+    compact = norm(text).replace(" ", "")
+    if not compact:
+        return 0.0
+    score = SequenceMatcher(None, compact, "janvanek").ratio()
+    if score >= 0.72:
+        return score
+    # OCR on tiny spreadsheet text often loses the first J or diacritics.
+    if compact.startswith(("janvan", "ianvan", "lanvan", "anvan")):
+        return max(score, 0.76)
+    if 5 <= len(compact) <= 13 and "v" in compact and "n" in compact and score >= 0.55:
+        return score
+    return 0.0
+
+
+def _work_crop_tsv(source, box, scale=5):
+    crop = source.crop(box).convert("L")
+    crop = crop.resize((crop.width * scale, crop.height * scale), Image.Resampling.LANCZOS)
+    crop = ImageOps.autocontrast(crop)
+    crop = ImageEnhance.Contrast(crop).enhance(1.9)
+    crop = crop.filter(ImageFilter.SHARPEN)
+    with tempfile.TemporaryDirectory(prefix="haneva-shift-ocr-") as temp:
+        target = Path(temp) / "crop.png"
+        crop.save(target)
+        rows = _tesseract_tsv(target)
+    return rows, scale
+
+
+def _scan_work_image(path, year_hint=None):
+    source = Image.open(path)
+    width, height = source.size
+    if width < 500 or height < 180:
+        raise ValueError("Screenshot směn je příliš malý.")
+
+    # Layout is intentionally ratio-based so monthly screenshots can have
+    # different pixel sizes while keeping the same Excel/Sheets structure.
+    top = max(0, int(height * 0.045))
+    bottom = min(height, int(height * 0.985))
+    date_box = (0, top, max(90, int(width * 0.047)), bottom)
+    morning_box = (int(width * 0.038), top, int(width * 0.56), bottom)
+    afternoon_box = (int(width * 0.605), top, int(width * 0.865), bottom)
+
+    date_words, date_scale = _work_crop_tsv(source, date_box, scale=5)
+    fallback_year = int(year_hint) if year_hint else date.today().year
+    date_hits = []
+    month_year = []
+    for word in date_words:
+        parsed = _work_date_from_text(word["text"], fallback_year)
+        if not parsed:
             continue
-        dates.append({"date": d.isoformat(), "x": word["left"] + word["width"]/2, "y": word["top"] + word["height"]/2})
+        global_y = top + (word["top"] + word["height"] / 2) / date_scale
+        date_hits.append((parsed, global_y))
+        month_year.append((parsed.month, parsed.year))
 
-    # Build OCR line groups and look for Jan + Vaněk/Vanek on the same visual line.
-    by_line = {}
-    for w in words:
-        key = (w.get("block_num"), w.get("par_num"), w.get("line_num"))
-        by_line.setdefault(key, []).append(w)
-    name_hits = []
-    for line in by_line.values():
-        line.sort(key=lambda w: w["left"])
-        text = " ".join(w["text"] for w in line)
-        n = norm(text)
-        if "jan vanek" not in n and not ("jan" in n and "vanek" in n):
-            continue
-        left = min(w["left"] for w in line); right = max(w["left"] + w["width"] for w in line)
-        top = min(w["top"] for w in line); bottom = max(w["top"] + w["height"] for w in line)
-        name_hits.append({"x": (left+right)/2, "y": (top+bottom)/2, "text": text})
+    if len(date_hits) < 5:
+        raise ValueError("Ve screenshotu jsem nenašel dost datumů pro spolehlivé přiřazení směn.")
 
-    if not dates:
-        raise ValueError("Ve screenshotu jsem nenašel datumové sloupce.")
-    if not name_hits:
-        raise ValueError("Ve screenshotu jsem nenašel jméno Jan Vaněk.")
+    date_hits.sort(key=lambda item: item[1])
+    # The spreadsheet contains one visual row per calendar day. Estimate row
+    # height from OCR positions, where missing OCR rows create 2x/3x gaps.
+    y_values = [item[1] for item in date_hits]
+    diffs = [b - a for a, b in zip(y_values, y_values[1:]) if b - a > 2]
+    if not diffs:
+        raise ValueError("Řádky směn se nepodařilo rozpoznat.")
+    base_step = min(diffs)
+    normalized_steps = []
+    for diff in diffs:
+        multiplier = max(1, round(diff / base_step))
+        normalized_steps.append(diff / multiplier)
+    row_step = median(normalized_steps)
+    anchor_date, anchor_y = date_hits[0]
+    # The first OCR date is usually day 1. Preserve its actual parsed day so
+    # the algorithm also works for partial-month screenshots.
+    anchor_day = anchor_date.day
+    month, year = max(set(month_year), key=month_year.count)
 
-    # Remove duplicate OCR date hits.
-    unique_dates = {}
-    for d in dates:
-        unique_dates[d["date"]] = d
-    dates = sorted(unique_dates.values(), key=lambda x: x["x"])
+    def day_for_y(global_y):
+        day = anchor_day + round((global_y - anchor_y) / row_step)
+        try:
+            return date(year, month, day)
+        except ValueError:
+            return None
 
-    # Split name occurrences into upper/lower bands. Upper = morning, lower = afternoon.
-    ys = sorted(hit["y"] for hit in name_hits)
-    threshold = median(ys)
-    if len(ys) >= 4:
-        gaps = [(ys[i+1]-ys[i], i) for i in range(len(ys)-1)]
-        gap, idx = max(gaps)
-        if gap > 15:
-            threshold = (ys[idx] + ys[idx+1]) / 2
+    def name_hits(box, shift_type):
+        words, scale = _work_crop_tsv(source, box, scale=5)
+        by_line = {}
+        for word in words:
+            key = (word.get("block_num"), word.get("par_num"), word.get("line_num"))
+            by_line.setdefault(key, []).append(word)
+        hits = []
+        for line in by_line.values():
+            line.sort(key=lambda w: w["left"])
+            best = None
+            for index, word in enumerate(line):
+                # Test one, two and three adjacent OCR tokens. This covers
+                # both "JanVaněk" and split "Jan" + "Vaněk".
+                for count in (1, 2, 3):
+                    part = line[index:index + count]
+                    if len(part) != count:
+                        continue
+                    text_value = " ".join(x["text"] for x in part)
+                    score = _work_name_score(text_value)
+                    if score <= 0:
+                        continue
+                    left = part[0]["left"]
+                    right = part[-1]["left"] + part[-1]["width"]
+                    candidate = {
+                        "score": score,
+                        "text": text_value,
+                        "x": (left + right) / 2,
+                        "y": word["top"] + word["height"] / 2,
+                    }
+                    if best is None or candidate["score"] > best["score"]:
+                        best = candidate
+            if not best:
+                continue
+            global_y = box[1] + best["y"] / scale
+            shift_date = day_for_y(global_y)
+            if not shift_date:
+                continue
+            hits.append({
+                "date": shift_date.isoformat(),
+                "type": shift_type,
+                "confidence": round(min(0.99, max(0.6, best["score"])), 2),
+                "source_text": clean(best["text"], 120),
+            })
+        return hits
 
-    shifts = []
-    seen = set()
-    for hit in name_hits:
-        nearest = min(dates, key=lambda d: abs(d["x"] - hit["x"]))
-        # Reject obviously far associations: half of median date spacing plus tolerance.
-        spacings = [dates[i+1]["x"] - dates[i]["x"] for i in range(len(dates)-1) if dates[i+1]["x"] > dates[i]["x"]]
-        spacing = median(spacings) if spacings else 220
-        if abs(nearest["x"] - hit["x"]) > max(90, spacing * 0.65):
-            continue
-        shift_type = "dopolední" if hit["y"] <= threshold else "odpolední"
-        key = (nearest["date"], shift_type)
-        if key in seen:
-            continue
-        seen.add(key)
-        shifts.append({"date": nearest["date"], "type": shift_type, "confidence": 0.82, "source_text": hit["text"]})
-    shifts.sort(key=lambda x: (x["date"], x["type"]))
+    shifts = name_hits(morning_box, "dopolední") + name_hits(afternoon_box, "odpolední")
+    # Keep the highest-confidence occurrence for each date/type.
+    unique = {}
+    for shift in shifts:
+        key = (shift["date"], shift["type"])
+        if key not in unique or shift["confidence"] > unique[key]["confidence"]:
+            unique[key] = shift
+    shifts = sorted(unique.values(), key=lambda x: (x["date"], x["type"]))
     if not shifts:
-        raise ValueError("Jméno jsem našel, ale nedokázal jsem ho spolehlivě přiřadit k datumům.")
+        raise ValueError("Jméno Jan Vaněk jsem v tabulce nenašel.")
     return shifts
-
 
 def scan_work(body, filename, content_type="", year_hint=None):
     if not body or len(body) > MAX_UPLOAD:
