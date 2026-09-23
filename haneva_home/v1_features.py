@@ -665,6 +665,47 @@ def _money(value):
         return None
 
 
+
+def import_recipe_document(body, filename, content_type=""):
+    if not body or len(body) > MAX_UPLOAD:
+        raise ValueError("Soubor receptu může mít nejvýše 18 MB.")
+    mime, ext = _mime_from_body(body, filename, content_type)
+    with tempfile.TemporaryDirectory(prefix="haneva-recipe-import-") as temp:
+        path = Path(temp) / ("recipe" + ext)
+        path.write_bytes(body)
+        text = _ocr_text(path, mime)
+    lines = [clean(line, 260) for line in text.splitlines() if clean(line, 260)]
+    if not lines:
+        raise ValueError("V receptu jsem nenašel čitelný text.")
+    title = lines[0]
+    ingredient_lines, instruction_lines = [], []
+    section = "unknown"
+    for line in lines[1:]:
+        n = norm(line)
+        if n in {"ingredience", "suroviny", "ingredience suroviny"} or n.startswith("ingredience "):
+            section = "ingredients"
+            continue
+        if n in {"postup", "priprava", "postup pripravy"} or n.startswith("postup "):
+            section = "instructions"
+            continue
+        if section == "ingredients":
+            ingredient_lines.append(line.lstrip("•-* "))
+        elif section == "instructions":
+            instruction_lines.append(line)
+        else:
+            instruction_lines.append(line)
+    # If a document has a clear ingredients heading but no explicit procedure
+    # heading, keep the remaining text as ingredients only until a numbered step.
+    if ingredient_lines and not instruction_lines:
+        instruction_lines = []
+    return {
+        "title": title[:160],
+        "ingredients_text": "\n".join(ingredient_lines),
+        "instructions": "\n".join(instruction_lines),
+        "raw_text": text[:12000],
+    }
+
+
 def _receipt_date(text):
     for m in DATE_RE.finditer(text):
         day, month, year = int(m.group(1)), int(m.group(2)), m.group(3)
@@ -1592,6 +1633,10 @@ def handle_post(handler, parsed):
     path = parsed.path
     if path == "/api/v1/recipes":
         handler.send_json({"recipe": create_recipe(handler.read_json())}, 201); return True
+    if path == "/api/v1/recipes/import":
+        body = _raw_upload(handler)
+        filename = handler.headers.get("X-Filename", "recept")
+        handler.send_json(import_recipe_document(body, filename, handler.headers.get("Content-Type", "")), 201); return True
     m = re.fullmatch(r"/api/v1/recipes/(\d+)/vote", path)
     if m:
         payload = handler.read_json()
