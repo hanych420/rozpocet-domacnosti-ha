@@ -435,7 +435,7 @@ def ocr_file(path, mime_type):
             images = [Path(path)]
         chunks = []
         for image in images:
-            proc = subprocess.run(["tesseract", str(image), "stdout", "-l", "ces+eng", "--psm", "6"],
+            proc = subprocess.run(["tesseract", str(image), "stdout", "-l", "ces", "--psm", "6"],
                                   capture_output=True, timeout=45)
             if proc.returncode == 0:
                 chunks.append(proc.stdout.decode("utf-8", "replace"))
@@ -459,7 +459,15 @@ def _parse_date(text):
 
 
 def _parse_money(value):
-    raw = str(value or "").replace(" ", "").replace(".", "").replace(",", ".")
+    raw = str(value or "").strip().replace("\u00a0", "").replace(" ", "")
+    if not raw:
+        return None
+    # Czech receipts normally use comma as a decimal separator. Preserve a
+    # decimal dot when no comma is present instead of treating it as thousands.
+    if "," in raw:
+        raw = raw.replace(".", "").replace(",", ".")
+    elif raw.count(".") > 1:
+        raw = raw.replace(".", "")
     try:
         return float(raw)
     except ValueError:
