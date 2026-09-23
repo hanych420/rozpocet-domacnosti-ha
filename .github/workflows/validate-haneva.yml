@@ -1,0 +1,36 @@
+name: Validate Haneva Home
+on:
+  push:
+    branches:
+      - main
+      - release/haneva-1.0
+  pull_request:
+    paths:
+      - "haneva_home/**"
+      - ".github/workflows/validate-haneva.yml"
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compile Python
+        run: |
+          python3 -m py_compile haneva_home/*.py
+      - name: Check inline JavaScript
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re, subprocess, tempfile
+          for path in Path("haneva_home").glob("*.html"):
+              text=path.read_text(encoding="utf-8")
+              for i,script in enumerate(re.findall(r"<script[^>]*>(.*?)</script>",text,re.S|re.I)):
+                  if not script.strip():
+                      continue
+                  p=Path(tempfile.gettempdir())/f"{path.stem}-{i}.js"
+                  p.write_text(script,encoding="utf-8")
+                  subprocess.run(["node","--check",str(p)],check=True)
+          PY
+      - name: Build add-on image
+        run: docker build haneva_home -t haneva-home-validation

@@ -15,6 +15,7 @@ import sys
 import threading
 
 import shopping
+import v1_features
 
 HOST = "0.0.0.0"
 PORT = 8100
@@ -112,6 +113,7 @@ def init_db():
         conn.commit()
     os.makedirs(TICKET_DIR, exist_ok=True)
     shopping.init_db()
+    v1_features.init_db()
 
 
 def valid_date(value):
@@ -484,6 +486,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        try:
+            if v1_features.handle_get(self, parsed):
+                return
+        except (ValueError, json.JSONDecodeError) as exc:
+            self.send_json({"error": str(exc)}, 400)
+            return
+        except KeyError as exc:
+            self.send_json({"error": str(exc.args[0])}, 404)
+            return
+        except Exception as exc:
+            self.send_json({"error": f"Funkci se nepodařilo načíst: {exc}"}, 500)
+            return
 
         if path == "/health":
             self.send_bytes(b"ok\n", 200, "text/plain; charset=utf-8")
@@ -559,7 +573,20 @@ class Handler(BaseHTTPRequestHandler):
         self.send_bytes(b"Not found\n", 404, "text/plain; charset=utf-8")
 
     def do_POST(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        try:
+            if v1_features.handle_post(self, parsed):
+                return
+        except (ValueError, json.JSONDecodeError) as exc:
+            self.send_json({"error": str(exc)}, 400)
+            return
+        except KeyError as exc:
+            self.send_json({"error": str(exc.args[0])}, 404)
+            return
+        except Exception as exc:
+            self.send_json({"error": f"Požadavek se nepodařilo zpracovat: {exc}"}, 500)
+            return
         try:
             ticket_match = re.fullmatch(r"/api/events/(\d+)/tickets", path)
             if ticket_match:
@@ -611,7 +638,20 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": "Soubor se nepodařilo uložit. Zkontroluj volné místo a zkus to znovu."}, 500)
 
     def do_PUT(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        try:
+            if v1_features.handle_put(self, parsed):
+                return
+        except (ValueError, json.JSONDecodeError) as exc:
+            self.send_json({"error": str(exc)}, 400)
+            return
+        except KeyError as exc:
+            self.send_json({"error": str(exc.args[0])}, 404)
+            return
+        except Exception as exc:
+            self.send_json({"error": f"Požadavek se nepodařilo zpracovat: {exc}"}, 500)
+            return
         try:
             if path == "/api/settings/colors":
                 colors = save_colors(self.read_json())
@@ -661,7 +701,17 @@ class Handler(BaseHTTPRequestHandler):
             self.send_json({"error": str(exc)}, 400)
 
     def do_DELETE(self):
-        path = urlparse(self.path).path
+        parsed = urlparse(self.path)
+        path = parsed.path
+        try:
+            if v1_features.handle_delete(self, parsed):
+                return
+        except KeyError as exc:
+            self.send_json({"error": str(exc.args[0])}, 404)
+            return
+        except Exception as exc:
+            self.send_json({"error": f"Požadavek se nepodařilo zpracovat: {exc}"}, 500)
+            return
         bundle_match = re.fullmatch(r"/api/events/(\d+)/tickets", path)
         if bundle_match:
             delete_ticket(int(bundle_match.group(1)))
@@ -709,7 +759,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_HEAD(self):
         path = urlparse(self.path).path
-        if path in ("/", "/index.html", "/kalendar", "/kalendar/", "/nakupy", "/nakupy/", "/health"):
+        if path in ("/", "/index.html", "/kalendar", "/kalendar/", "/nakupy", "/nakupy/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/prehled", "/prehled/", "/health"):
             self.send_common_headers(200, "text/html; charset=utf-8", 0)
         else:
             self.send_common_headers(404, "text/plain; charset=utf-8", 0)

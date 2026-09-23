@@ -171,6 +171,8 @@
       #eventDialog .actions-right button{min-height:46px;width:100%}
       #eventDialog .save{font-size:16px}
     }
+
+    .work-upload{display:grid;gap:12px;padding:2px 0}.work-drop{display:flex;align-items:center;justify-content:center;min-height:120px;border:2px dashed #cbd5e1;border-radius:16px;background:#f8fafc;color:#526071;font-weight:800;cursor:pointer;text-align:center;padding:18px}.work-status{font-size:12px;color:#6b7280}.work-preview{display:grid;gap:7px;max-height:48vh;overflow:auto}.work-row{display:grid;grid-template-columns:auto 1fr 145px;gap:10px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:#fff}.work-row input{width:20px;height:20px}.work-row select{border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}.work-date{font-weight:850}.work-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}@media(max-width:620px){.work-row{grid-template-columns:auto 1fr}.work-row select{grid-column:2}.view-toggle{flex-wrap:wrap}.work-button{flex-basis:100%}}
   </style>
 </head>
 <body>
@@ -180,7 +182,7 @@
 
     <section class="panel">
       <div class="toolbar">
-        <div class="view-toggle"><button class="month-button" data-view="month">Měsíc</button><button class="agenda-button" data-view="agenda">Agenda</button></div>
+        <div class="view-toggle"><button class="month-button" data-view="month">Měsíc</button><button class="agenda-button" data-view="agenda">Agenda</button><button class="work-button" id="workImportBtn" type="button">Práce</button></div>
         <div class="nav"><button class="icon-btn" id="prevMonth">←</button><button id="todayButton">Dnes</button><div class="month-title" id="monthTitle"></div><button class="icon-btn" id="nextMonth">→</button></div>
       </div>
       <div class="filters" id="filters">
@@ -256,6 +258,8 @@
     </form>
   </dialog>
 
+
+  <dialog id="workDialog"><div class="modal"><div class="modal-head"><h2>Pracovní směny</h2><button class="close" type="button" id="closeWork" aria-label="Zavřít">×</button></div><div class="form-grid"><div class="field full"><div class="work-upload"><label class="work-drop">📷 Nahrát screenshot tabulky směn<input id="workFile" type="file" accept="image/jpeg,image/png,image/webp" hidden></label><div class="work-status" id="workStatus">Haneva najde „Jan Vaněk“, datum a rozliší dopolední / odpolední. Před importem vše zkontroluješ.</div><div class="work-preview" id="workPreview"></div></div></div></div><div class="actions"><span></span><div class="actions-right"><button class="secondary" type="button" id="cancelWork">Zrušit</button><button class="save" type="button" id="confirmWork" disabled>Přidat do kalendáře</button></div></div></div></dialog>
   <div class="toast" id="toast"></div>
 
   <script>
@@ -281,6 +285,7 @@
       removeTicketBundle:false,
       saving:false
     };
+    let workImport={import_id:null,shifts:[]};
     const mouseGesture={kind:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
     const touchGesture={kind:null,timer:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
 
@@ -862,7 +867,20 @@
       toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
     }
 
+
+    function openWork(){workImport={import_id:null,shifts:[]};$('workFile').value='';$('workPreview').innerHTML='';$('workStatus').textContent='Haneva najde „Jan Vaněk“, datum a rozliší dopolední / odpolední. Před importem vše zkontroluješ.';$('confirmWork').disabled=true;$('workDialog').showModal()}
+    function closeWork(){$('workDialog').close()}
+    function renderWorkPreview(){const box=$('workPreview');box.innerHTML='';workImport.shifts.forEach((shift,index)=>{const row=document.createElement('label');row.className='work-row';const d=parseIso(shift.date);row.innerHTML='<input type="checkbox" data-work-check="'+index+'" checked><div><div class="work-date">'+d.getDate()+'. '+(d.getMonth()+1)+'. '+d.getFullYear()+'</div><div class="work-status">'+escapeHtml(shift.source_text||'Jan Vaněk')+'</div></div><select data-work-type="'+index+'"><option value="dopolední" '+(shift.type==='dopolední'?'selected':'')+'>Dopolední</option><option value="odpolední" '+(shift.type==='odpolední'?'selected':'')+'>Odpolední</option></select>';box.appendChild(row)});$('confirmWork').disabled=!workImport.shifts.length;$('workStatus').textContent=workImport.shifts.length?'Rozpoznáno '+workImport.shifts.length+' směn. Zkontroluj je a potvrď.':'Žádné směny jsem nenašel.'}
+    async function scanWorkFile(){const file=$('workFile').files[0];if(!file)return;$('workStatus').textContent='Čtu screenshot…';$('confirmWork').disabled=true;try{const res=await fetch('/api/v1/work/scan',{method:'POST',headers:{'Content-Type':file.type||'image/png','X-Filename':encodeURIComponent(file.name||'smeny.png'),'X-Shift-Year':String(state.cursor.getFullYear())},body:file});const data=await res.json();if(!res.ok)throw new Error(data.error||'Směny se nepodařilo přečíst.');workImport={import_id:data.import_id,shifts:data.shifts||[]};renderWorkPreview()}catch(err){$('workStatus').textContent=err.message;toast(err.message)}}
+    async function commitWork(){document.querySelectorAll('[data-work-check]').forEach(input=>{const i=Number(input.dataset.workCheck);if(workImport.shifts[i])workImport.shifts[i].selected=input.checked});document.querySelectorAll('[data-work-type]').forEach(select=>{const i=Number(select.dataset.workType);if(workImport.shifts[i])workImport.shifts[i].type=select.value});$('confirmWork').disabled=true;try{const res=await fetch('/api/v1/work/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(workImport)});const data=await res.json();if(!res.ok)throw new Error(data.error||'Směny se nepodařilo uložit.');closeWork();toast('Přidáno '+(data.added||[]).length+' směn.');await loadEvents()}catch(err){toast(err.message);$('confirmWork').disabled=false}}
+
     $('newEvent').addEventListener('click',()=>openNew());
+    $('workImportBtn').addEventListener('click',openWork);
+    $('closeWork').addEventListener('click',closeWork);
+    $('cancelWork').addEventListener('click',closeWork);
+    $('workFile').addEventListener('change',scanWorkFile);
+    $('confirmWork').addEventListener('click',commitWork);
+    $('workDialog').addEventListener('click',e=>{if(e.target===$('workDialog'))closeWork()});
     $('prevMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()-1);state.expandedDays.clear();loadEvents()});
     $('nextMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()+1);state.expandedDays.clear();loadEvents()});
     $('todayButton').addEventListener('click',()=>{const n=new Date();state.cursor=new Date(n.getFullYear(),n.getMonth(),1);state.expandedDays.clear();loadEvents()});
