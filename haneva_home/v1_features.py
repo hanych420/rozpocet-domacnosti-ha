@@ -521,10 +521,20 @@ def shopping_preview():
             if recipe["title"] not in merged[key]["recipes"]:
                 merged[key]["recipes"].append(recipe["title"])
     state = shopping.get_state()
-    active = {norm(i["name"]): i for i in state["items"] if not i["checked"]}
+    active_items = [i for i in state["items"] if not i["checked"]]
+    active = {norm(i["name"]): i for i in active_items}
     out = []
     for item in merged.values():
         existing = active.get(item["name_norm"])
+        similarity = 1.0 if existing else 0.0
+        if not existing:
+            best = None
+            for candidate in active_items:
+                score = _token_similarity(item["name"], candidate["name"])
+                if score > similarity:
+                    best, similarity = candidate, score
+            if best and similarity >= 0.78:
+                existing = best
         qty = ""
         if item["amount"] is not None:
             qty = f"{item['amount']:g} {item['unit']}".strip()
@@ -536,11 +546,28 @@ def shopping_preview():
             "quantity": qty,
             "already_on_list": bool(existing),
             "existing_item": existing,
+            "match_confidence": round(similarity, 3) if existing else 0,
             "selected": not bool(existing),
             "recipes": item["recipes"],
         })
     out.sort(key=lambda x: (x["already_on_list"], x["name_norm"]))
     return {"items": out, "cycle_key": plan["cycle_key"], "cycle_label": plan["cycle_label"]}
+
+
+def _merge_quantity_text(existing, incoming):
+    existing, incoming = clean(existing, 80), clean(incoming, 80)
+    if not existing:
+        return incoming
+    if not incoming:
+        return existing
+    rx = re.compile(r"^\s*(\d+(?:[.,]\d+)?)\s*([^\d]+)?$")
+    a, b = rx.match(existing), rx.match(incoming)
+    if a and b and norm(a.group(2) or "") == norm(b.group(2) or ""):
+        total = float(a.group(1).replace(",", ".")) + float(b.group(1).replace(",", "."))
+        return f"{total:g} {clean(a.group(2) or '', 30)}".strip()
+    if norm(existing) == norm(incoming):
+        return existing
+    return f"{existing} + {incoming}"[:80]
 
 
 def commit_shopping(payload):
@@ -553,6 +580,19 @@ def commit_shopping(payload):
         name = clean(item.get("name"), 160)
         if not name:
             continue
+        existing = item.get("existing_item") if isinstance(item.get("existing_item"), dict) else None
+        if existing and existing.get("id"):
+            try:
+                updated = shopping.update_item(int(existing["id"]), {
+                    "name": existing.get("name") or name,
+                    "quantity": _merge_quantity_text(existing.get("quantity"), item.get("quantity")),
+                    "preferred_store": existing.get("preferred_store") or "any",
+                    "checked": False,
+                })
+                added.append(updated)
+                continue
+            except (KeyError, ValueError, TypeError):
+                pass
         added.append(shopping.add_item({
             "name": name,
             "quantity": clean(item.get("quantity"), 80),
@@ -734,7 +774,7 @@ def _token_similarity(a, b):
 
 
 def _increment_completed_history(name):
-    n = norm(name)
+    n = shopping.normalize_name(name)
     now = datetime.now(timezone.utc).isoformat()
     with shopping.db() as conn:
         conn.execute(
