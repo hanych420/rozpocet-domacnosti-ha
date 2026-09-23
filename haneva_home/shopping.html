@@ -68,7 +68,7 @@
       });
     }
     function renderHistory(){
-      const box=$('historyChips');box.innerHTML='';const active=activeNames();const rows=state.history.slice(0,18);
+      const box=$('historyChips');box.innerHTML='';const active=activeNames();const rows=state.history.filter(h=>(h.times_completed||0)>0).slice(0,18);
       if(!rows.length){box.innerHTML='<span class="small">Až něco párkrát koupíte, objeví se to tady.</span>';return}
       rows.forEach(h=>{const b=document.createElement('button');b.type='button';b.className='chip'+(active.has(h.name_norm)?' added':'');b.textContent=(active.has(h.name_norm)?'✓ ':'＋ ')+h.display_name;b.addEventListener('click',async()=>{if(activeNames().has(h.name_norm)){toast('Už je na seznamu.');return}try{await api('/api/shopping/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:h.display_name,preferred_store:'any'})});toast(`Přidáno: ${h.display_name}`);await loadState()}catch(err){toast(err.message)}});box.appendChild(b)});
     }
