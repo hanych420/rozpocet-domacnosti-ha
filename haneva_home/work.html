@@ -13,7 +13,7 @@ async function scanFile(f){
     var d=await r.json();
     if(!r.ok)throw new Error(d.error||'Nepodařilo se načíst směny.');
     draft=d.shifts||[];
-    $('status').textContent=draft.length?'Zkontroluj rozpoznané směny.':'Jan Vaněk nebyl s datem a typem směny bezpečně rozpoznán.';
+    $('status').textContent=draft.length?'Rozpoznáno '+draft.length+' směn. Zkontroluj je před uložením.':'Jan Vaněk nebyl s datem a typem směny bezpečně rozpoznán.';
     renderPreview();
   }catch(e){
     $('status').textContent=e.message;
