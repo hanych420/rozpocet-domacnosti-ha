@@ -691,22 +691,24 @@ def _work_norm_token(value):
 
 def _work_parse_date_token(value):
     raw = str(value or "").strip()
-    # Nejdřív respektujeme skutečné oddělovače. Původní parser odstraňoval
-    # tečky a z 10.9.2026 udělal 1.9.2026, což rozbilo model řádků.
-    match = re.search(r"(?<!\\d)([0-3]?\\d)[.\\-/:]([01]?\\d)[.\\-/:](20\\d{2}|\\d{2})(?!\\d)", raw)
-    if match:
+    # Google Sheets screenshoty mají datum typicky jako D.M.YYYY. Záměrně
+    # nepoužíváme regex s odstraňováním teček, aby 10.9.2026 nikdy nespadlo na 1.9.
+    normalized = raw
+    for separator in ("-", "/", ":"):
+        normalized = normalized.replace(separator, ".")
+    parts = [part.strip() for part in normalized.split(".") if part.strip()]
+    if len(parts) == 3 and all(part.isdigit() for part in parts):
         try:
-            year = int(match.group(3))
+            day, month, year = int(parts[0]), int(parts[1]), int(parts[2])
             if year < 100:
                 year += 2000
-            parsed = date(year, int(match.group(2)), int(match.group(1)))
+            parsed = date(year, month, day)
+            return parsed if 2020 <= parsed.year <= 2100 else None
         except (ValueError, TypeError):
             return None
-        return parsed if 2020 <= parsed.year <= 2100 else None
 
-    # Bez oddělovačů přijímáme jen osmimístné DDMMYYYY. Sedm číslic je
-    # nejednoznačných (např. 1092026 = 1.9. nebo 10.9.), proto je raději ignorujeme.
-    digits = re.sub(r"\\D", "", raw)
+    # Bez oddělovačů přijímáme jen jednoznačné DDMMYYYY.
+    digits = "".join(ch for ch in raw if ch.isdigit())
     if len(digits) != 8:
         return None
     try:
@@ -714,7 +716,6 @@ def _work_parse_date_token(value):
     except (ValueError, TypeError):
         return None
     return parsed if 2020 <= parsed.year <= 2100 else None
-
 
 def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
     """OCR jednoho výřezu; souřadnice vrací zpět v pixelech původního screenshotu."""
@@ -1049,17 +1050,19 @@ def _save_work_scan_log(source_name, width, height, model, region_left, region_r
 
 
 def _scan_work_image(image_path, source_name):
-    """Rychlý OCR průchod navržený pro Raspberry Pi: max. 2–3 běhy Tesseractu."""
+    """OCR pracovní tabulky; preferuje screenshot pouze odpolední části."""
     with Image.open(image_path) as image:
         width, height = image.size
 
     overview_words = _work_ocr_words(
         image_path,
         None,
-        requested_scale=2.45,
+        requested_scale=2.7,
         psm=6,
     )
-    date_words = [word for word in overview_words if float(word.get("left", 0)) < width * 0.12]
+
+    # Sloupec Datum je vlevo i u oříznuté varianty.
+    date_words = [word for word in overview_words if float(word.get("left", 0)) < width * 0.17]
     model = _work_row_model(date_words)
     if not model:
         return [], [{
@@ -1072,42 +1075,63 @@ def _scan_work_image(image_path, source_name):
             "y_delta": None,
             "decision": "model_dat",
             "accepted": False,
-            "reason": "Nepodařilo se spolehlivě určit měsíc a řádky podle sloupce Datum.",
+            "reason": "Nepodařilo se určit řádky podle sloupce Datum. Screenshot musí obsahovat sloupec Datum.",
         }], " ".join(word["text"] for word in overview_words)[:30000], {
             "width": width, "height": height, "model": None, "left": None, "right": None,
             "region_method": None,
         }
 
-    header_words = [word for word in overview_words if float(word.get("top", 0)) < height * 0.38]
-    region = _work_afternoon_region(image_path, width, height, header_words)
-    if not region:
-        return [], [{
-            "token": "",
-            "similarity": None,
-            "ocr_confidence": None,
-            "x": None,
-            "x_percent": None,
-            "row_day": None,
-            "y_delta": None,
-            "decision": "hlavicka_odpoledni",
-            "accepted": False,
-            "reason": "Řádky s daty byly nalezeny, ale OCR nenašlo hlavičku Odpolední směna.",
-        }], " ".join(word["text"] for word in overview_words)[:30000], {
-            "width": width, "height": height, "model": model, "left": None, "right": None,
-            "region_method": "nenalezena-hlavicka",
-        }
+    header_words = [word for word in overview_words if float(word.get("top", 0)) < height * 0.40]
+    header_tokens = [_work_norm_token(word.get("text")) for word in _work_name_candidates(header_words)]
+    has_morning = any(difflib.SequenceMatcher(None, token, "ranni").ratio() >= 0.66 for token in header_tokens if token)
+    has_afternoon = any(difflib.SequenceMatcher(None, token, "odpoledni").ratio() >= 0.56 for token in header_tokens if token)
 
-    left, right = region["left"], region["right"]
     top = max(0, int(model["day1_y"] - model["spacing"] * 1.6))
     bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 0.8)))
-    crop = (max(0, int(left) + 2), top, min(width, int(right) - 2), bottom)
 
+    if has_afternoon and not has_morning:
+        # Doporučený režim: screenshot obsahuje jen Datum + odpolední blok.
+        left = _work_vertical_boundary(image_path, top, bottom, 0.07, 0.24, 0.12)
+        right = width - 2
+        region = {
+            "left": left,
+            "right": right,
+            "method": "afternoon-only",
+            "header_token": "Odpolední směna",
+            "header_similarity": 100.0,
+        }
+    else:
+        # Zpětná kompatibilita pro celý screenshot tabulky.
+        region = _work_afternoon_region(image_path, width, height, header_words)
+        if not region:
+            return [], [{
+                "token": "",
+                "similarity": None,
+                "ocr_confidence": None,
+                "x": None,
+                "x_percent": None,
+                "row_day": None,
+                "y_delta": None,
+                "decision": "hlavicka_odpoledni",
+                "accepted": False,
+                "reason": "Na celém screenshotu se nepodařilo najít hranice odpolední části. Doporučený postup je screenshotnout pouze odpolední část včetně sloupce Datum.",
+            }], " ".join(word["text"] for word in overview_words)[:30000], {
+                "width": width, "height": height, "model": model, "left": None, "right": None,
+                "region_method": "nenalezena-hlavicka",
+            }
+        left, right = region["left"], region["right"]
+
+    left, right = region["left"], region["right"]
+    crop = (max(0, int(left) + 2), top, min(width, int(right) - 2), bottom)
     afternoon_words = _work_ocr_words(
         image_path,
         crop,
         requested_scale=5.0,
         psm=6,
     )
+
+    # Přidáme i rozpoznání z přehledového průchodu; někdy právě ono přečte
+    # Jan Vaněk lépe než detailní OCR.
     overview_afternoon_words = [
         word for word in overview_words
         if left <= float(word.get("left", 0)) + float(word.get("width", 0)) / 2 <= right
@@ -1143,7 +1167,7 @@ def _scan_work_image(image_path, source_name):
         "y_delta": None,
         "decision": "hranice_odpoledniho_bloku",
         "accepted": False,
-        "reason": "Blok odpolední směny určen podle hlavičky; metoda: " + region.get("method", "neznámá") + ".",
+        "reason": "Režim importu: " + region.get("method", "neznámý") + ".",
     })
     debug_text = " ".join(word["text"] for word in (overview_words + afternoon_words))[:30000]
     meta = {
