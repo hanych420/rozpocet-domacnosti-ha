@@ -733,7 +733,8 @@ def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
         scale = min(float(requested_scale), max(1.0, 6500.0 / max(1, region.width)))
         target = (max(1, int(region.width * scale)), max(1, int(region.height * scale)))
         if target != region.size:
-            region = region.resize(target, Image.Resampling.LANCZOS)
+            resampling = getattr(Image, "Resampling", Image)
+            region = region.resize(target, resampling.LANCZOS)
         region = ImageEnhance.Contrast(region).enhance(1.8)
         region = region.filter(ImageFilter.SHARPEN)
         with tempfile.NamedTemporaryFile(prefix="haneva-work-ocr-", suffix=".png") as temp_image:
@@ -1107,8 +1108,14 @@ def _scan_work_image(image_path, source_name):
         requested_scale=5.0,
         psm=6,
     )
+    overview_afternoon_words = [
+        word for word in overview_words
+        if left <= float(word.get("left", 0)) + float(word.get("width", 0)) / 2 <= right
+        and top <= float(word.get("top", 0)) + float(word.get("height", 0)) / 2 <= bottom
+    ]
+    extract_words = afternoon_words + overview_afternoon_words
     shifts, diagnostics = _work_extract_afternoons(
-        afternoon_words, model, source_name, width, left, right
+        extract_words, model, source_name, width, left, right
     )
 
     if not shifts:
@@ -1175,10 +1182,42 @@ def scan_work(original_name, body):
             image_path = rendered
         try:
             shifts, diagnostics, debug_text, meta = _scan_work_image(image_path, source_name)
-        except (OSError, ValueError, subprocess.SubprocessError):
-            shifts, diagnostics, debug_text = [], [], ""
+        except (OSError, ValueError, subprocess.SubprocessError) as exc:
+            shifts, diagnostics, debug_text = [], [{
+                "token": "",
+                "similarity": None,
+                "ocr_confidence": None,
+                "x": None,
+                "x_percent": None,
+                "row_day": None,
+                "y_delta": None,
+                "decision": "ocr_runtime",
+                "accepted": False,
+                "reason": f"OCR proces selhal: {type(exc).__name__}: {exc}",
+            }], ""
             with Image.open(image_path) as image:
-                meta = {"width": image.width, "height": image.height, "model": None, "left": None, "right": None}
+                meta = {"width": image.width, "height": image.height, "model": None, "left": None, "right": None, "region_method": "runtime-error"}
+        except Exception as exc:
+            # Never turn a scan problem into an HTML 500 page behind HA ingress.
+            print(f"[haneva-v1] unexpected work OCR error: {type(exc).__name__}: {exc}", flush=True)
+            shifts, diagnostics, debug_text = [], [{
+                "token": "",
+                "similarity": None,
+                "ocr_confidence": None,
+                "x": None,
+                "x_percent": None,
+                "row_day": None,
+                "y_delta": None,
+                "decision": "ocr_runtime",
+                "accepted": False,
+                "reason": f"Interní chyba OCR: {type(exc).__name__}: {exc}",
+            }], ""
+            try:
+                with Image.open(image_path) as image:
+                    width, height = image.size
+            except Exception:
+                width, height = 0, 0
+            meta = {"width": width, "height": height, "model": None, "left": None, "right": None, "region_method": "runtime-error"}
 
         if not shifts and mime == "application/pdf":
             try:
@@ -1191,16 +1230,32 @@ def scan_work(original_name, body):
                 diagnostics.extend(fallback_diag)
                 debug_text = text[:30000]
 
-        scan_id = _save_work_scan_log(
-            source_name,
-            meta.get("width"),
-            meta.get("height"),
-            meta.get("model"),
-            meta.get("left"),
-            meta.get("right"),
-            diagnostics,
-            debug_text,
-        )
+        try:
+            scan_id = _save_work_scan_log(
+                source_name,
+                meta.get("width"),
+                meta.get("height"),
+                meta.get("model"),
+                meta.get("left"),
+                meta.get("right"),
+                diagnostics,
+                debug_text,
+            )
+        except Exception as exc:
+            print(f"[haneva-v1] work OCR log failed: {type(exc).__name__}: {exc}", flush=True)
+            scan_id = None
+            diagnostics.append({
+                "token": "",
+                "similarity": None,
+                "ocr_confidence": None,
+                "x": None,
+                "x_percent": None,
+                "row_day": None,
+                "y_delta": None,
+                "decision": "logovani",
+                "accepted": False,
+                "reason": f"OCR proběhlo, ale nepodařilo se uložit diagnostický log: {type(exc).__name__}: {exc}",
+            })
         for shift in shifts:
             shift["scan_id"] = scan_id
         accepted_diagnostics = [row for row in diagnostics if row.get("accepted")]
@@ -1222,6 +1277,30 @@ def scan_work(original_name, body):
             },
         }
 
+
+
+def work_ocr_health():
+    result = {
+        "pillow_version": getattr(__import__("PIL"), "__version__", ""),
+        "has_resampling": hasattr(Image, "Resampling"),
+        "tesseract": shutil.which("tesseract") or "",
+        "ces_language": False,
+        "database_ok": False,
+    }
+    try:
+        proc = subprocess.run(["tesseract", "--list-langs"], capture_output=True, timeout=8)
+        langs = proc.stdout.decode("utf-8", "replace").splitlines()
+        result["ces_language"] = any(line.strip() == "ces" for line in langs)
+    except Exception as exc:
+        result["tesseract_error"] = f"{type(exc).__name__}: {exc}"
+    try:
+        with db() as conn:
+            conn.execute("SELECT 1 FROM work_scan_logs LIMIT 1").fetchone()
+        result["database_ok"] = True
+    except Exception as exc:
+        result["database_error"] = f"{type(exc).__name__}: {exc}"
+    result["ok"] = bool(result["tesseract"] and result["ces_language"] and result["database_ok"])
+    return result
 
 def commit_work(payload):
     shifts = payload.get("shifts") or []

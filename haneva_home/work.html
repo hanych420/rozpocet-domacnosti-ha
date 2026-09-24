@@ -134,11 +134,27 @@ async function scanFile(file){
         ? 'OCR požadavek skončil chybou serveru/proxy (HTTP '+r.status+'). Po aktualizaci zkus stejný screenshot znovu.'
         : 'Server vrátil nečitelnou odpověď (HTTP '+r.status+').');
     }
-    if(!r.ok)throw new Error(d.error||d.detail||'Nepodařilo se načíst směny.');
+    if(!r.ok){
+      var detail=d.detail?(' · '+d.detail):'';
+      throw new Error((d.error||'Nepodařilo se načíst směny.')+detail);
+    }
     draft=d.shifts||[];diagnostics=d.diagnostics||[];scanId=d.scan_id||null;window.lastScanSummary=d.summary||{};$('save').classList.remove('hidden');
     $('status').textContent=draft.length?'Rozpoznáno '+draft.length+' odpoledních směn. Zkontroluj je před uložením.':'Nenašla se žádná bezpečně rozpoznaná odpolední směna.';
     renderPreview();loadScanHistory();
-  }catch(e){$('status').textContent=e.message}
+  }catch(e){
+    var message=e.message||String(e);
+    try{
+      var health=await api('/api/v1/work/health');
+      if(!health.ok){
+        var bits=[];
+        if(!health.tesseract)bits.push('chybí Tesseract');
+        if(!health.ces_language)bits.push('chybí čeština pro OCR');
+        if(!health.database_ok)bits.push('nefunguje OCR databáze');
+        if(bits.length)message+=' · Diagnostika: '+bits.join(', ');
+      }
+    }catch(_){}
+    $('status').textContent=message;
+  }
   finally{$('pasteZone').classList.remove('active')}
 }
 $('file').onchange=function(){scanFile(this.files[0])};
