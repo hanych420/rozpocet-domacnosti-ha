@@ -1070,13 +1070,35 @@ def _scan_work_image(image_path, source_name):
     )
     model = _work_row_model(date_words)
     if not model:
-        return [], [], "", {"width": width, "height": height, "model": None, "left": None, "right": None}
+        return [], [{
+            "token": "",
+            "similarity": None,
+            "ocr_confidence": None,
+            "x": None,
+            "x_percent": None,
+            "row_day": None,
+            "y_delta": None,
+            "decision": "model_dat",
+            "accepted": False,
+            "reason": "Nepodařilo se spolehlivě určit měsíc a řádky podle sloupce Datum.",
+        }], "", {"width": width, "height": height, "model": None, "left": None, "right": None, "region_method": None}
 
     top = max(0, int(model["day1_y"] - model["spacing"] * 2.5))
     bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
     region = _work_afternoon_region(image_path, width, height)
     if not region:
-        return [], [], "", {"width": width, "height": height, "model": model, "left": None, "right": None, "region_method": "nenalezena-hlavicka"}
+        return [], [{
+            "token": "",
+            "similarity": None,
+            "ocr_confidence": None,
+            "x": None,
+            "x_percent": None,
+            "row_day": None,
+            "y_delta": None,
+            "decision": "hlavicka_odpoledni",
+            "accepted": False,
+            "reason": "Řádky s daty byly nalezeny, ale OCR nenašlo hlavičku Odpolední směna.",
+        }], "", {"width": width, "height": height, "model": model, "left": None, "right": None, "region_method": "nenalezena-hlavicka"}
     left = region["left"]
     right = region["right"]
 
@@ -1189,6 +1211,9 @@ def scan_work(original_name, body):
                 "candidates_accepted": len(accepted_diagnostics),
                 "region_left_percent": round(meta["left"] / meta["width"] * 100, 1) if meta.get("left") is not None and meta.get("width") else None,
                 "region_right_percent": round(meta["right"] / meta["width"] * 100, 1) if meta.get("right") is not None and meta.get("width") else None,
+                "region_method": meta.get("region_method"),
+                "header_token": meta.get("header_token"),
+                "header_similarity": meta.get("header_similarity"),
             },
         }
 
