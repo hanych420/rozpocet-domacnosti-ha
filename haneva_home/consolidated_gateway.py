@@ -379,19 +379,28 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 return
             if path in {"/api/v1/receipts/scan", "/api/v1/work/scan"}:
                 try:
-                    length = int(self.headers.get("Content-Length", "0"))
-                except ValueError:
-                    length = 0
-                if length <= 0 or length > v1_features.MAX_UPLOAD:
-                    raise ValueError("Soubor chybí nebo je příliš velký.")
-                filename = unquote(self.headers.get("X-Filename", "upload"))
-                body = self.rfile.read(length)
-                if len(body) != length:
-                    raise ValueError("Soubor nebyl nahrán celý.")
-                if path.endswith("/receipts/scan"):
-                    self.send_json({"receipt": v1_features.scan_receipt(filename, body)})
-                else:
-                    self.send_json(v1_features.scan_work(filename, body))
+                    try:
+                        length = int(self.headers.get("Content-Length", "0"))
+                    except ValueError:
+                        length = 0
+                    if length <= 0 or length > v1_features.MAX_UPLOAD:
+                        raise ValueError("Soubor chybí nebo je příliš velký.")
+                    filename = unquote(self.headers.get("X-Filename", "upload"))
+                    body = self.rfile.read(length)
+                    if len(body) != length:
+                        raise ValueError("Soubor nebyl nahrán celý.")
+                    if path.endswith("/receipts/scan"):
+                        self.send_json({"receipt": v1_features.scan_receipt(filename, body)})
+                    else:
+                        self.send_json(v1_features.scan_work(filename, body))
+                except (ValueError, TypeError, KeyError):
+                    raise
+                except Exception as exc:
+                    print(f"[haneva-v1] scan failed path={path}: {type(exc).__name__}: {exc}", flush=True)
+                    self.send_json({
+                        "error": "OCR zpracování selhalo na serveru.",
+                        "detail": f"{type(exc).__name__}: {exc}",
+                    }, 500)
                 return
             if path == "/api/v1/receipts/commit":
                 self.send_json(v1_features.commit_receipt(self.read_json()), 201)
