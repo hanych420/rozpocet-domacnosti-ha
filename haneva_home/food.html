@@ -12,7 +12,7 @@ button,input,textarea,select{font:inherit}.wrap{width:min(980px,calc(100% - 28px
 .tinder{max-width:520px;margin:auto}.swipe-card{border-radius:25px;overflow:hidden;background:#fff;border:1px solid var(--line);box-shadow:0 20px 55px rgba(31,41,55,.12)}.swipe-img{height:min(50vh,390px);display:grid;place-items:center;font-size:66px;background:linear-gradient(135deg,#ffe4f1,#fff2ca);background-size:cover;background-position:center}.swipe-copy{padding:18px}.swipe-copy h2{font-size:29px;margin:0 0 7px}.swipe-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:15px}.no,.yes{border:0;border-radius:16px;padding:14px;font-size:22px;font-weight:900}.no{background:#f3f4f6}.yes{background:#dcfce7;color:#047857}.match{background:#ecfdf5;color:#047857;border-radius:15px;padding:12px 14px;font-weight:850;margin-bottom:12px}
 .plan{display:flex;flex-direction:column;gap:9px}.plan-row{display:flex;align-items:center;gap:12px;border:1px solid var(--line);border-radius:15px;padding:11px;background:#fff}.plan-thumb{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,#ffe4f1,#fff2ca);background-size:cover;background-position:center;display:grid;place-items:center;font-size:24px}.plan-copy{flex:1;min-width:0}.plan-name{font-weight:850}.plan-meta{font-size:11px;color:var(--muted);margin-top:3px}.plan-row.done{opacity:.48}.settings{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}.settings select{border:1px solid var(--line);border-radius:11px;padding:8px 10px;background:#fff}.empty{padding:32px;text-align:center;color:#9299a5}.hidden{display:none!important}
 dialog{border:0;border-radius:22px;padding:0;width:min(620px,calc(100% - 24px));box-shadow:0 30px 80px rgba(17,24,39,.25)}dialog::backdrop{background:rgba(17,24,39,.34)}.modal{padding:20px}.modal-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:15px}.modal-head h2{margin:0}.close{border:0;background:#f3f4f6;border-radius:10px;width:36px;height:36px}.fields{display:grid;grid-template-columns:1fr 110px;gap:10px}.field{display:flex;flex-direction:column;gap:5px}.field.full{grid-column:1/-1}.field label{font-size:11px;font-weight:850;color:#697386}.field input,.field textarea{border:1px solid #dfe3ea;border-radius:11px;padding:10px;background:#fff}.field textarea{min-height:90px;resize:vertical}.ingredients{display:flex;flex-direction:column;gap:6px}.ing{display:grid;grid-template-columns:1fr 120px 36px;gap:6px}.ing button{border:0;border-radius:9px;background:#f3f4f6}.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}.preview-row{display:grid;grid-template-columns:auto 1fr 120px;gap:8px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.preview-row:last-child{border-bottom:0}.preview-row small{color:var(--muted)}
-.import-summary{padding:11px 12px;border-radius:12px;background:#f8fafc;color:#475569;font-size:13px;font-weight:800;margin-bottom:10px}.import-list{max-height:330px;overflow:auto;display:flex;flex-direction:column;gap:7px}.import-row{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;padding:9px 10px;border:1px solid var(--line);border-radius:12px}.import-row.duplicate{opacity:.55}.import-row strong{display:block}.import-row small{color:var(--muted)}.toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:11px 14px;border-radius:12px;opacity:0;transform:translateY(8px);transition:.2s}.toast.show{opacity:1;transform:none}
+.import-summary{padding:11px 12px;border-radius:12px;background:#f8fafc;color:#475569;font-size:13px;font-weight:800;margin-bottom:10px}.import-list{max-height:330px;overflow:auto;display:flex;flex-direction:column;gap:7px}.import-row{display:grid;grid-template-columns:auto 1fr;gap:9px;align-items:start;padding:9px 10px;border:1px solid var(--line);border-radius:12px}.import-row.conflict{opacity:.55}.import-row strong{display:block}.import-row small{color:var(--muted)}.toast{position:fixed;right:16px;bottom:16px;background:#111827;color:#fff;padding:11px 14px;border-radius:12px;opacity:0;transform:translateY(8px);transition:.2s}.toast.show{opacity:1;transform:none}
 @media(max-width:680px){.grid{grid-template-columns:1fr}.wrap{width:min(100% - 18px,980px);padding-top:14px}.panel{padding:14px;border-radius:20px}.fields{grid-template-columns:1fr}.field.full{grid-column:auto}.ing{grid-template-columns:1fr 95px 36px}.preview-row{grid-template-columns:auto 1fr}.preview-row input[type=text]{grid-column:2}}
 </style></head>
 <body><main class="wrap">
@@ -26,20 +26,31 @@ dialog{border:0;border-radius:22px;padding:0;width:min(620px,calc(100% - 24px));
   <div class="panel-head">
     <h2>Naše recepty</h2>
     <div class="recipe-tools">
-      <button class="secondary" id="recipeTemplate" type="button">CSV šablona</button>
-      <button class="secondary" id="importRecipes" type="button">Import receptů</button>
-      <input id="recipeCsvFile" type="file" accept=".csv,text/csv" hidden>
+      <button class="secondary" id="recipeTemplate" type="button">XLSX šablona</button>
+      <button class="secondary" id="importRecipes" type="button">Import XLSX</button>
+      <input id="recipeXlsxFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
       <button class="secondary" id="exportImages" type="button">Export pro obrázky</button>
       <button class="secondary" id="importImages" type="button">Import ZIP obrázků</button>
       <input id="recipeZipFile" type="file" accept=".zip,application/zip" hidden>
       <button class="primary" id="newRecipe">＋ Přidat recept</button>
     </div>
   </div>
-  <div class="workflow" id="imageWorkflow"><strong>Obrázky:</strong> Export pro obrázky → pošli CSV do ChatGPT → stáhni ZIP → přetáhni ZIP sem. Soubory se párují podle ID, např. <strong>recipe-12.png</strong>.</div>
+  <div class="workflow" id="imageWorkflow"><strong>Recepty:</strong> pracujeme pouze s XLSX. Import pozná i tvoji Kuchařku s ingrediencemi roztaženými do více sloupců. <strong>Obrázky:</strong> Export pro obrázky → pošli XLSX do ChatGPT → stáhni ZIP → přetáhni ZIP sem. Soubory se párují podle interního ID, např. <strong>recipe-12.png</strong>.</div>
   <div class="grid" id="recipeGrid"></div>
 </section>
 </main>
-<dialog id="recipeDialog"><form class="modal" id="recipeForm"><div class="modal-head"><h2 id="recipeDialogTitle">Nový recept</h2><button class="close" type="button" id="closeRecipe">×</button></div><div class="fields"><div class="field full"><label>Název</label><input id="rTitle" required maxlength="180"></div><div class="field"><label>Popis</label><input id="rDesc" maxlength="500"></div><div class="field"><label>Porce</label><input id="rServings" type="number" min="1" max="30" value="2"></div><div class="field full"><label>Fotka / AI obrázek – URL</label><input id="rImage" placeholder="https://…"></div><div class="field full"><label>Ingredience</label><div class="ingredients" id="ingredients"></div><button class="secondary" type="button" id="addIngredient" style="align-self:flex-start;margin-top:5px">＋ Ingredience</button></div><div class="field full"><label>Postup</label><textarea id="rInstructions"></textarea></div></div><div class="modal-actions"><button class="secondary" type="button" id="cancelRecipe">Zrušit</button><button class="primary" type="submit">Uložit</button></div></form></dialog>
+<dialog id="recipeDialog"><form class="modal" id="recipeForm"><div class="modal-head"><h2 id="recipeDialogTitle">Nový recept</h2><button class="close" type="button" id="closeRecipe">×</button></div><div class="fields">
+<div class="field"><label>ID z Kuchařky</label><input id="rExternalId" maxlength="80" placeholder="např. R001"></div>
+<div class="field"><label>Porce</label><input id="rServings" type="number" min="1" max="30" value="2"></div>
+<div class="field full"><label>Název</label><input id="rTitle" required maxlength="180"></div>
+<div class="field"><label>Typ</label><input id="rType" maxlength="120" placeholder="Kuřecí, Bezmasá…"></div>
+<div class="field"><label>Do krabičky</label><input id="rLunchbox" maxlength="80" placeholder="Vhodné / Nevhodné"></div>
+<div class="field"><label>Doba přípravy</label><input id="rPrepTime" maxlength="80" placeholder="např. 45 min"></div>
+<div class="field"><label>Popis</label><input id="rDesc" maxlength="500"></div>
+<div class="field full"><label>Fotka / AI obrázek – URL</label><input id="rImage" placeholder="https://…"></div>
+<div class="field full"><label>Ingredience</label><div class="ingredients" id="ingredients"></div><button class="secondary" type="button" id="addIngredient" style="align-self:flex-start;margin-top:5px">＋ Ingredience</button></div>
+<div class="field full"><label>Postup</label><textarea id="rInstructions"></textarea></div>
+</div><div class="modal-actions"><button class="secondary" type="button" id="cancelRecipe">Zrušit</button><button class="primary" type="submit">Uložit</button></div></form></dialog>
 <dialog id="previewDialog"><div class="modal"><div class="modal-head"><h2>Náhled nákupu</h2><button class="close" id="closePreview">×</button></div><div id="previewList"></div><div class="modal-actions"><button class="secondary" id="cancelPreview">Zrušit</button><button class="primary" id="confirmPreview">Přidat vybrané</button></div></div></dialog><dialog id="recipeImportDialog"><div class="modal"><div class="modal-head"><h2>Import receptů</h2><button class="close" id="closeRecipeImport">×</button></div><div class="import-summary" id="recipeImportSummary"></div><div class="import-list" id="recipeImportList"></div><div class="modal-actions"><button class="secondary" id="cancelRecipeImport">Zrušit</button><button class="primary" id="confirmRecipeImport">Importovat vybrané</button></div></div></dialog>
 <div class="toast" id="toast"></div>
 <script>
@@ -52,49 +63,39 @@ function imgStyle(url){return url?'background-image:url(&quot;'+esc(url)+'&quot;
 function setTab(name){document.querySelectorAll('.tab').forEach(function(b){b.classList.toggle('active',b.dataset.tab===name)});document.querySelectorAll('.tabview').forEach(function(v){v.classList.toggle('hidden',v.id!==name)})}
 document.querySelectorAll('.tab').forEach(function(b){b.onclick=function(){setTab(b.dataset.tab)}});
 
-function csvCell(value){
-  var s=String(value==null?'':value);
-  return '"'+s.replace(/"/g,'""')+'"';
-}
-function downloadText(name,text,type){
-  var blob=new Blob([text],{type:type||'text/plain;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');
-  a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url)},1000);
-}
 function recipeTemplate(){
-  var rows=[
-    ['Název','Popis','Porce','Ingredience','Postup'],
-    ['Kuře na paprice','Krémová klasika','4','Kuřecí stehna | 1 kg\nCibule | 2 ks\nPaprika | 2 lžičky','Nakrájej cibuli.\nPřidej kuře a duste.']
-  ];
-  downloadText('haneva-recepty-sablona.csv','\ufeff'+rows.map(function(row){return row.map(csvCell).join(';')}).join('\r\n'),'text/csv;charset=utf-8');
+  location.href='/api/v1/recipes/template.xlsx';
 }
-async function exportRecipesForImages(){
-  var d=await api('/api/v1/recipes/image-export'),rows=[['recipe_id','nazev','popis','porce','ingredience','image_filename','has_image']];
-  (d.recipes||[]).forEach(function(r){rows.push([r.recipe_id,r.title,r.description,r.servings,r.ingredients,r.image_filename,r.has_image?'ano':'ne'])});
-  downloadText('haneva-recepty-pro-obrazky.csv','\ufeff'+rows.map(function(row){return row.map(csvCell).join(';')}).join('\r\n'),'text/csv;charset=utf-8');
-  toast('Export pro obrázky stažen.');
+function exportRecipesForImages(){
+  location.href='/api/v1/recipes/image-export.xlsx';
+  toast('Připravuji XLSX pro obrázky.');
 }
 function renderRecipeImport(){
   var d=state.recipeImport,box=$('recipeImportList');box.innerHTML='';
   if(!d)return;
-  $('recipeImportSummary').textContent='Nalezeno '+d.count+' receptů · '+d.new_count+' nových · '+d.duplicate_count+' už existuje.';
+  $('recipeImportSummary').textContent='List '+d.sheet+' · '+d.count+' receptů · '+d.new_count+' nových · '+d.update_count+' aktualizací'+(d.conflict_count?' · '+d.conflict_count+' konfliktů':'')+'.';
   (d.recipes||[]).forEach(function(r,index){
-    var row=document.createElement('label');row.className='import-row'+(r.duplicate?' duplicate':'');
-    row.innerHTML='<input type="checkbox" '+(r.selected?'checked':'')+' '+(r.duplicate?'disabled':'')+'><span><strong>'+esc(r.title)+'</strong><small>'+r.ingredients.length+' ingrediencí · '+r.servings+' porce'+(r.duplicate?' · už existuje':'')+'</small></span>';
+    var conflict=r.action==='conflict';
+    var label=r.action==='new'?'nový':r.action==='update'?'aktualizovat':'konflikt ID/názvu';
+    var row=document.createElement('label');row.className='import-row'+(conflict?' conflict':'');
+    row.innerHTML='<input type="checkbox" '+(r.selected?'checked':'')+' '+(conflict?'disabled':'')+'><span><strong>'+esc(r.external_id)+' · '+esc(r.title)+'</strong><small>'+esc(label)+' · '+r.ingredients.length+' ingrediencí'+(r.recipe_type?' · '+esc(r.recipe_type):'')+(r.lunchbox?' · '+esc(r.lunchbox):'')+'</small></span>';
     var cb=row.querySelector('input');cb.onchange=function(){state.recipeImport.recipes[index].selected=cb.checked};
     box.appendChild(row);
   });
 }
-async function previewRecipeCsv(file){
+async function previewRecipeXlsx(file){
   if(!file)return;
-  var r=await fetch('/api/v1/recipes/import-csv/preview',{method:'POST',headers:{'Content-Type':file.type||'text/csv','X-Filename':encodeURIComponent(file.name)},body:file});
-  var d=await r.json();if(!r.ok)throw new Error(d.error||'CSV se nepodařilo načíst.');
+  var r=await fetch('/api/v1/recipes/import-xlsx/preview',{method:'POST',headers:{'Content-Type':file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','X-Filename':encodeURIComponent(file.name)},body:file});
+  var d=await r.json();if(!r.ok)throw new Error(d.error||'XLSX se nepodařilo načíst.');
   state.recipeImport=d;renderRecipeImport();$('recipeImportDialog').showModal();
 }
-async function commitRecipeCsv(){
+async function commitRecipeXlsx(){
   if(!state.recipeImport)return;
-  var d=await api('/api/v1/recipes/import-csv/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipes:state.recipeImport.recipes})});
-  $('recipeImportDialog').close();state.recipeImport=null;await load();toast('Importováno '+d.count+' receptů.');
+  var d=await api('/api/v1/recipes/import-xlsx/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipes:state.recipeImport.recipes})});
+  $('recipeImportDialog').close();state.recipeImport=null;await load();
+  toast('Hotovo: '+d.created_count+' nových, '+d.updated_count+' aktualizovaných.');
 }
+
 async function importRecipeZip(file){
   if(!file)return;
   toast('Nahrávám obrázky…');
@@ -105,32 +106,32 @@ async function importRecipeZip(file){
 
 async function load(){var all=await Promise.all([api('/api/session').catch(function(){return {person:''}}),api('/api/v1/recipes'),api('/api/v1/planned')]);state.person=all[0].person||'';state.recipes=all[1].recipes||[];state.planned=all[2];$('resetDay').value=String(state.planned.reset_day);renderRecipes();renderPlan();await loadTinder()}
 function renderPlan(){var p=state.planned;$('cycleLabel').textContent=fmtDate(p.start)+' – '+fmtDate(p.end);var box=$('planList');box.innerHTML='';if(!p.recipes.length){box.innerHTML='<div class="empty">Zatím jste se na ničem neshodli. Otevři „Co budeme vařit?“.</div>';return}p.recipes.forEach(function(r){var row=document.createElement('div');row.className='plan-row'+(r.cooked?' done':'');row.innerHTML='<div class="plan-thumb" style="'+imgStyle(r.image_url)+'">'+(r.image_url?'':'🍽️')+'</div><div class="plan-copy"><div class="plan-name">'+esc(r.title)+'</div><div class="plan-meta">'+r.ingredients.length+' ingrediencí · '+r.servings+' porce</div></div><button class="secondary">'+(r.cooked?'Vrátit':'Uvařeno')+'</button>';row.querySelector('button').onclick=async function(){await api('/api/v1/planned/'+r.plan_id,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({cooked:!r.cooked})});state.planned=await api('/api/v1/planned');renderPlan()};box.appendChild(row)})}
-function renderRecipes(){var box=$('recipeGrid');box.innerHTML='';if(!state.recipes.length){box.innerHTML='<div class="empty">Přidej první recept.</div>';return}state.recipes.forEach(function(r){var el=document.createElement('article');el.className='recipe';el.innerHTML='<div class="recipe-img" style="'+imgStyle(r.image_url)+'">'+(r.image_url?'':'🍲')+'</div><div class="recipe-copy"><h3>'+esc(r.title)+'</h3><p>'+esc(r.description||r.ingredients.length+' ingrediencí')+'</p><div class="recipe-actions"><button data-a="plan">＋ Plán</button><button data-a="edit">Upravit</button><button data-a="delete">Smazat</button></div></div>';el.querySelector('[data-a=plan]').onclick=async function(){state.planned=await api('/api/v1/planned/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipe_id:r.id})});renderPlan();toast('Přidáno do plánu.')};el.querySelector('[data-a=edit]').onclick=function(){openRecipe(r)};el.querySelector('[data-a=delete]').onclick=async function(){await api('/api/v1/recipes/'+r.id,{method:'DELETE'});await load();toast('Recept odstraněn.')};box.appendChild(el)})}
+function renderRecipes(){var box=$('recipeGrid');box.innerHTML='';if(!state.recipes.length){box.innerHTML='<div class="empty">Přidej první recept.</div>';return}state.recipes.forEach(function(r){var el=document.createElement('article');el.className='recipe';var meta=[r.recipe_type,r.lunchbox,r.prep_time].filter(Boolean).join(' · ');el.innerHTML='<div class="recipe-img" style="'+imgStyle(r.image_url)+'">'+(r.image_url?'':'🍲')+'</div><div class="recipe-copy"><h3>'+esc(r.title)+'</h3><p>'+esc(r.description||meta||r.ingredients.length+' ingrediencí')+'</p><div class="recipe-actions"><button data-a="plan">＋ Plán</button><button data-a="edit">Upravit</button><button data-a="delete">Smazat</button></div></div>';el.querySelector('[data-a=plan]').onclick=async function(){state.planned=await api('/api/v1/planned/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipe_id:r.id})});renderPlan();toast('Přidáno do plánu.')};el.querySelector('[data-a=edit]').onclick=function(){openRecipe(r)};el.querySelector('[data-a=delete]').onclick=async function(){await api('/api/v1/recipes/'+r.id,{method:'DELETE'});await load();toast('Recept odstraněn.')};box.appendChild(el)})}
 async function loadTinder(){if(!state.person){$('tinderBox').innerHTML='<div class="empty">V nastavení kalendáře nejdřív přiřaď tomuto účtu Hanycha nebo Evu.</div>';return}var d=await api('/api/v1/tinder?person='+encodeURIComponent(state.person));state.tinder=(d.recipes||[]).filter(function(r){return r.vote==null});renderTinder()}
 function renderTinder(){var box=$('tinderBox');box.innerHTML='';var r=state.tinder[0];if(!r){box.innerHTML='<div class="empty">Pro tento týden už máš všechny recepty projeté.</div>';return}box.innerHTML='<div class="swipe-card"><div class="swipe-img" style="'+imgStyle(r.image_url)+'">'+(r.image_url?'':'🍲')+'</div><div class="swipe-copy"><h2>'+esc(r.title)+'</h2><p style="color:#707887">'+esc(r.description||'')+'</p><div class="swipe-actions"><button class="no">✕</button><button class="yes">♥</button></div></div></div>';box.querySelector('.no').onclick=function(){vote(r,false)};box.querySelector('.yes').onclick=function(){vote(r,true)}}
 async function vote(r,yes){var d=await api('/api/v1/tinder/vote',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({recipe_id:r.id,person:state.person,vote:yes})});state.tinder.shift();if(d.matched){$('matchBanner').textContent='Shoda! '+r.title+' je rovnou v Plánovaných receptech.';$('matchBanner').classList.remove('hidden');state.planned=await api('/api/v1/planned');renderPlan();setTimeout(function(){$('matchBanner').classList.add('hidden')},3500)}renderTinder()}
 function addIng(name,qty){name=name||'';qty=qty||'';var row=document.createElement('div');row.className='ing';row.innerHTML='<input class="ing-name" placeholder="např. cibule" value="'+esc(name)+'"><input class="ing-qty" placeholder="množství" value="'+esc(qty)+'"><button type="button">×</button>';row.querySelector('button').onclick=function(){row.remove()};$('ingredients').appendChild(row)}
-function openRecipe(r){state.editId=r?r.id:null;$('recipeDialogTitle').textContent=r?'Upravit recept':'Nový recept';$('rTitle').value=r?r.title:'';$('rDesc').value=r?r.description:'';$('rServings').value=r?r.servings:2;$('rImage').value=r?r.image_url:'';$('rInstructions').value=r?r.instructions:'';$('ingredients').innerHTML='';var list=r&&r.ingredients&&r.ingredients.length?r.ingredients:[{name:'',quantity:''}];list.forEach(function(i){addIng(i.name,i.quantity)});$('recipeDialog').showModal()}
+function openRecipe(r){state.editId=r?r.id:null;$('recipeDialogTitle').textContent=r?'Upravit recept':'Nový recept';$('rExternalId').value=r?r.external_id||'':'';$('rTitle').value=r?r.title:'';$('rType').value=r?r.recipe_type||'':'';$('rLunchbox').value=r?r.lunchbox||'':'';$('rPrepTime').value=r?r.prep_time||'':'';$('rDesc').value=r?r.description:'';$('rServings').value=r?r.servings:2;$('rImage').value=r?r.image_url:'';$('rInstructions').value=r?r.instructions:'';$('ingredients').innerHTML='';var list=r&&r.ingredients&&r.ingredients.length?r.ingredients:[{name:'',quantity:''}];list.forEach(function(i){addIng(i.name,i.quantity)});$('recipeDialog').showModal()}
 
 $('recipeTemplate').onclick=recipeTemplate;
-$('exportImages').onclick=function(){exportRecipesForImages().catch(function(e){toast(e.message)})};
-$('importRecipes').onclick=function(){$('recipeCsvFile').click()};
-$('recipeCsvFile').onchange=function(){var file=this.files[0];this.value='';previewRecipeCsv(file).catch(function(e){toast(e.message)})};
+$('exportImages').onclick=exportRecipesForImages;
+$('importRecipes').onclick=function(){$('recipeXlsxFile').click()};
+$('recipeXlsxFile').onchange=function(){var file=this.files[0];this.value='';previewRecipeXlsx(file).catch(function(e){toast(e.message)})};
 $('importImages').onclick=function(){$('recipeZipFile').click()};
 $('recipeZipFile').onchange=function(){var file=this.files[0];this.value='';importRecipeZip(file).catch(function(e){toast(e.message)})};
 $('closeRecipeImport').onclick=$('cancelRecipeImport').onclick=function(){$('recipeImportDialog').close();state.recipeImport=null};
-$('confirmRecipeImport').onclick=function(){commitRecipeCsv().catch(function(e){toast(e.message)})};
+$('confirmRecipeImport').onclick=function(){commitRecipeXlsx().catch(function(e){toast(e.message)})};
 var recipePanel=$('recipes'),workflow=$('imageWorkflow');
 ['dragenter','dragover'].forEach(function(type){recipePanel.addEventListener(type,function(e){e.preventDefault();workflow.classList.add('drag')})});
 ['dragleave','drop'].forEach(function(type){recipePanel.addEventListener(type,function(e){e.preventDefault();workflow.classList.remove('drag')})});
 recipePanel.addEventListener('drop',function(e){
   var file=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(!file)return;
   if(/\.zip$/i.test(file.name))importRecipeZip(file).catch(function(err){toast(err.message)});
-  else if(/\.csv$/i.test(file.name))previewRecipeCsv(file).catch(function(err){toast(err.message)});
-  else toast('Přetáhni CSV s recepty nebo ZIP s obrázky.');
+  else if(/\.xlsx$/i.test(file.name))previewRecipeXlsx(file).catch(function(err){toast(err.message)});
+  else toast('Přetáhni XLSX s recepty nebo ZIP s obrázky.');
 });
 $('newRecipe').onclick=function(){openRecipe(null)};$('addIngredient').onclick=function(){addIng()};$('closeRecipe').onclick=$('cancelRecipe').onclick=function(){$('recipeDialog').close()};
-$('recipeForm').onsubmit=async function(e){e.preventDefault();var ingredients=[].slice.call(document.querySelectorAll('.ing')).map(function(x){return {name:x.querySelector('.ing-name').value.trim(),quantity:x.querySelector('.ing-qty').value.trim()}}).filter(function(x){return x.name});var body={title:$('rTitle').value,description:$('rDesc').value,servings:$('rServings').value,image_url:$('rImage').value,instructions:$('rInstructions').value,ingredients:ingredients};await api('/api/v1/recipes'+(state.editId?'/'+state.editId:''),{method:state.editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('recipeDialog').close();await load();toast('Recept uložen.')}
+$('recipeForm').onsubmit=async function(e){e.preventDefault();var ingredients=[].slice.call(document.querySelectorAll('.ing')).map(function(x){return {name:x.querySelector('.ing-name').value.trim(),quantity:x.querySelector('.ing-qty').value.trim()}}).filter(function(x){return x.name});var body={external_id:$('rExternalId').value,recipe_type:$('rType').value,lunchbox:$('rLunchbox').value,prep_time:$('rPrepTime').value,title:$('rTitle').value,description:$('rDesc').value,servings:$('rServings').value,image_url:$('rImage').value,instructions:$('rInstructions').value,ingredients:ingredients};await api('/api/v1/recipes'+(state.editId?'/'+state.editId:''),{method:state.editId?'PUT':'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});$('recipeDialog').close();await load();toast('Recept uložen.')}
 $('resetDay').onchange=async function(){await api('/api/v1/settings/reset-day',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({day:Number($('resetDay').value)})});state.planned=await api('/api/v1/planned');renderPlan();toast('Den plánování změněn.')}
 $('shoppingPreview').onclick=async function(){var d=await api('/api/v1/shopping-preview');state.preview=d.items||[];var box=$('previewList');box.innerHTML='';if(!state.preview.length){box.innerHTML='<div class="empty">Plánované recepty nemají žádné ingredience.</div>'}state.preview.forEach(function(i,idx){var row=document.createElement('div');row.className='preview-row';row.innerHTML='<input type="checkbox" '+(i.selected?'checked':'')+' '+(i.already_on_list?'disabled':'')+'><div><strong>'+esc(i.name)+'</strong>'+(i.already_on_list?'<br><small>Už je na seznamu – nepřidávám podruhé</small>':'')+'</div><input type="text" value="'+esc(i.quantity)+'" placeholder="množství">';var cb=row.querySelector('input[type=checkbox]'),q=row.querySelector('input[type=text]');cb.onchange=function(){state.preview[idx].selected=cb.checked};q.oninput=function(){state.preview[idx].quantity=q.value};box.appendChild(row)});$('previewDialog').showModal()}
 $('closePreview').onclick=$('cancelPreview').onclick=function(){$('previewDialog').close()};$('confirmPreview').onclick=async function(){var d=await api('/api/v1/shopping-preview/add',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:state.preview})});$('previewDialog').close();toast('Přidáno '+d.count+' položek.')}
