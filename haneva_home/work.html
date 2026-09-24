@@ -97,13 +97,16 @@ function renderDiagnostics(){
   var summary=window.lastScanSummary||{};
   $('diagMeta').textContent=(summary.month&&summary.year?'Tabulka '+summary.month+'/'+summary.year+' · ':'')+
     (summary.region_left_percent!=null?'odpolední blok '+summary.region_left_percent+'–'+summary.region_right_percent+' % šířky screenshotu · ':'')+
+    (summary.header_token?'hlavička „'+summary.header_token+'“'+(summary.header_similarity!=null?' '+summary.header_similarity+' %':'')+' · ':'')+
     'přijato '+accepted.length+' kandidátů, odmítnuto '+rejected.length+'.';
   var rows=accepted.concat(rejected.slice(0,20)),box=$('diagList');box.innerHTML='';
   if(!rows.length){box.innerHTML='<div class="diag-item">OCR neposkytlo žádného kandidáta podobného jménu Jan Vaněk.</div>';return}
   rows.forEach(function(x){
     var el=document.createElement('div');el.className='diag-item'+(x.accepted?' ok':'');
     var day=x.row_day?' · řádek '+x.row_day+'.':'';var xpos=x.x_percent!=null?' · x '+x.x_percent+' %':'';
-    el.innerHTML='<strong>'+(x.accepted?'✓ Odpolední':'× Odmítnuto')+'</strong> · „'+esc(x.token||'')+'“ · podobnost '+esc(x.similarity)+' %'+day+xpos+'<br>'+esc(x.reason||'');
+    var similarity=x.similarity!=null?' · podobnost '+esc(x.similarity)+' %':'';
+    var token=x.token?' · „'+esc(x.token)+'“':'';
+    el.innerHTML='<strong>'+(x.accepted?'✓ Odpolední':'× Diagnostika')+'</strong>'+token+similarity+day+xpos+'<br>'+esc(x.reason||'');
     box.appendChild(el);
   });
 }
