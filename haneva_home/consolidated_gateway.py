@@ -241,6 +241,17 @@ def _prepare_deals_payload(store, time_filter, query_text):
 class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
     server_version = f"HanevaHome/{VERSION}"
 
+    def send_download(self, body, filename, content_type="application/octet-stream"):
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("X-Content-Type-Options", "nosniff")
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(body)
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
@@ -267,8 +278,19 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         if path == "/api/v1/recipes":
             self.send_json({"recipes": v1_features.list_recipes()})
             return
-        if path == "/api/v1/recipes/image-export":
-            self.send_json({"recipes": v1_features.recipe_image_manifest()})
+        if path == "/api/v1/recipes/template.xlsx":
+            self.send_download(
+                v1_features.recipe_template_xlsx(),
+                "haneva-recepty-sablona.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            return
+        if path == "/api/v1/recipes/image-export.xlsx":
+            self.send_download(
+                v1_features.recipe_image_export_xlsx(),
+                "haneva-recepty-pro-obrazky.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
             return
         if path.startswith("/api/v1/recipe-images/"):
             filename = unquote(path.rsplit("/", 1)[-1])
@@ -380,20 +402,21 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             if path == "/api/v1/recipes":
                 self.send_json({"recipe": v1_features.save_recipe(self.read_json())}, 201)
                 return
-            if path == "/api/v1/recipes/import-csv/preview":
+            if path == "/api/v1/recipes/import-xlsx/preview":
                 try:
                     length = int(self.headers.get("Content-Length", "0"))
                 except ValueError:
                     length = 0
                 if length <= 0 or length > v1_features.MAX_UPLOAD:
-                    raise ValueError("CSV chybí nebo je příliš velké.")
+                    raise ValueError("XLSX chybí nebo je příliš velké.")
+                filename = unquote(self.headers.get("X-Filename", "recepty.xlsx"))
                 body = self.rfile.read(length)
                 if len(body) != length:
-                    raise ValueError("CSV nebylo nahráno celé.")
-                self.send_json(v1_features.preview_recipe_csv(body))
+                    raise ValueError("XLSX nebylo nahráno celé.")
+                self.send_json(v1_features.preview_recipe_xlsx(filename, body))
                 return
-            if path == "/api/v1/recipes/import-csv/commit":
-                self.send_json(v1_features.commit_recipe_import(self.read_json()), 201)
+            if path == "/api/v1/recipes/import-xlsx/commit":
+                self.send_json(v1_features.commit_recipe_xlsx_import(self.read_json()), 201)
                 return
             if path == "/api/v1/recipe-images/import-zip":
                 try:
