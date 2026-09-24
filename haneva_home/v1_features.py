@@ -17,6 +17,7 @@ import unicodedata
 from collections import Counter
 from statistics import median
 import xml.etree.ElementTree as ET
+from xml.sax.saxutils import escape as xml_escape
 
 from PIL import Image, ImageEnhance, ImageFilter
 import uuid
@@ -58,6 +59,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS recipes(
           id INTEGER PRIMARY KEY AUTOINCREMENT,
           title TEXT NOT NULL,
+          external_id TEXT NOT NULL DEFAULT '',
+          recipe_type TEXT NOT NULL DEFAULT '',
+          lunchbox TEXT NOT NULL DEFAULT '',
+          prep_time TEXT NOT NULL DEFAULT '',
           description TEXT NOT NULL DEFAULT '',
           servings INTEGER NOT NULL DEFAULT 2,
           image_url TEXT NOT NULL DEFAULT '',
@@ -154,6 +159,16 @@ def init_db():
           created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
         """)
+        recipe_columns = {row["name"] for row in conn.execute("PRAGMA table_info(recipes)").fetchall()}
+        for column, ddl in (
+            ("external_id", "TEXT NOT NULL DEFAULT ''"),
+            ("recipe_type", "TEXT NOT NULL DEFAULT ''"),
+            ("lunchbox", "TEXT NOT NULL DEFAULT ''"),
+            ("prep_time", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if column not in recipe_columns:
+                conn.execute(f"ALTER TABLE recipes ADD COLUMN {column} {ddl}")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_recipes_external_id ON recipes(external_id)")
         work_columns = {row["name"] for row in conn.execute("PRAGMA table_info(work_shifts)").fetchall()}
         if "scan_id" not in work_columns:
             conn.execute("ALTER TABLE work_shifts ADD COLUMN scan_id INTEGER")
@@ -259,6 +274,10 @@ def save_recipe(payload, recipe_id=None):
     title = _clean(payload.get("title"), 180)
     if not title:
         raise ValueError("Název receptu je povinný.")
+    external_id = _clean(payload.get("external_id"), 80)
+    recipe_type = _clean(payload.get("recipe_type"), 120)
+    lunchbox = _clean(payload.get("lunchbox"), 80)
+    prep_time = _clean(payload.get("prep_time"), 80)
     description = _clean(payload.get("description"), 1000)
     instructions = str(payload.get("instructions") or "").strip()[:12000]
     image_url = _clean(payload.get("image_url"), 1000)
@@ -269,20 +288,27 @@ def save_recipe(payload, recipe_id=None):
         servings = 2
     data = json.dumps(ingredients, ensure_ascii=False)
     with db() as conn:
+        if external_id:
+            duplicate = conn.execute(
+                "SELECT id FROM recipes WHERE external_id=? AND id<>COALESCE(?, -1)",
+                (external_id, int(recipe_id) if recipe_id else None),
+            ).fetchone()
+            if duplicate:
+                raise ValueError(f"ID receptu {external_id} už používá jiný recept.")
         if recipe_id:
-            cur = conn.execute("""UPDATE recipes SET title=?,description=?,servings=?,image_url=?,ingredients_json=?,
-                instructions=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-                (title, description, servings, image_url, data, instructions, int(recipe_id)))
+            cur = conn.execute("""UPDATE recipes SET title=?,external_id=?,recipe_type=?,lunchbox=?,prep_time=?,
+                description=?,servings=?,image_url=?,ingredients_json=?,instructions=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                (title, external_id, recipe_type, lunchbox, prep_time, description, servings, image_url, data, instructions, int(recipe_id)))
             if not cur.rowcount:
                 raise KeyError("Recept nebyl nalezen.")
             rid = int(recipe_id)
         else:
-            cur = conn.execute("""INSERT INTO recipes(title,description,servings,image_url,ingredients_json,instructions)
-                VALUES(?,?,?,?,?,?)""", (title, description, servings, image_url, data, instructions))
+            cur = conn.execute("""INSERT INTO recipes(title,external_id,recipe_type,lunchbox,prep_time,description,servings,image_url,ingredients_json,instructions)
+                VALUES(?,?,?,?,?,?,?,?,?,?)""",
+                (title, external_id, recipe_type, lunchbox, prep_time, description, servings, image_url, data, instructions))
             rid = cur.lastrowid
         conn.commit()
         return recipe_dict(conn.execute("SELECT * FROM recipes WHERE id=?", (rid,)).fetchone())
-
 
 def delete_recipe(recipe_id):
     with db() as conn:
