@@ -874,23 +874,16 @@ def _work_vertical_boundary(image_path, y1, y2, lo_ratio, hi_ratio, default_rati
         return min(strong, key=lambda item: (abs(item[0] - expected), -item[1]))[0]
 
 
-def _work_afternoon_region(image_path, width, height):
-    """Najde blok Odpolední směna podle hlavičky, ne podle pevného procenta šířky."""
-    header_bottom = min(height, max(180, int(height * 0.38)))
-    header_words = _work_ocr_words(
-        image_path,
-        (0, 0, width, header_bottom),
-        requested_scale=2.5,
-        psm=6,
-    )
+def _work_afternoon_region(image_path, width, height, header_words):
+    """Najde blok Odpolední směna podle OCR hlavičky a čar tabulky."""
     target = "odpoledni"
     candidates = []
-    for word in header_words:
+    for word in _work_name_candidates(header_words):
         token = _work_norm_token(word.get("text"))
         if not token:
             continue
         score = difflib.SequenceMatcher(None, token, target).ratio()
-        if score >= 0.58:
+        if score >= 0.56:
             candidates.append((score, word))
     if not candidates:
         return None
@@ -898,19 +891,19 @@ def _work_afternoon_region(image_path, width, height):
     score, header = max(candidates, key=lambda item: item[0])
     header_left = float(header["left"])
     header_right = header_left + float(header["width"])
-    band_top = max(0, int(float(header["top"]) - 3))
-    band_bottom = min(height, int(float(header["top"]) + float(header["height"]) + 10))
+    band_top = max(0, int(float(header["top"]) - 5))
+    band_bottom = min(height, int(float(header["top"]) + float(header["height"]) + 14))
 
     with Image.open(image_path) as image:
         gray = image.convert("L")
         pixels = gray.load()
         band_height = max(1, band_bottom - band_top)
-        threshold = max(5, int(band_height * 0.62))
+        threshold = max(5, int(band_height * 0.55))
         strong_x = []
         for x in range(width):
             dark = 0
             for y in range(band_top, band_bottom):
-                if pixels[x, y] < 130:
+                if pixels[x, y] < 145:
                     dark += 1
             if dark >= threshold:
                 strong_x.append(x)
@@ -925,9 +918,9 @@ def _work_afternoon_region(image_path, width, height):
             previous = x
         clusters.append((start, previous))
     centers = [(a + b) / 2 for a, b in clusters]
+    left_candidates = [x for x in centers if x < header_left - 28]
+    right_candidates = [x for x in centers if x > header_right + 28]
 
-    left_candidates = [x for x in centers if x < header_left - 40]
-    right_candidates = [x for x in centers if x > header_right + 40]
     if left_candidates and right_candidates:
         left = max(left_candidates)
         right = min(right_candidates)
@@ -935,25 +928,20 @@ def _work_afternoon_region(image_path, width, height):
             return {
                 "left": left,
                 "right": right,
-                "method": "header",
+                "method": "header-lines",
                 "header_token": header.get("text", ""),
                 "header_similarity": round(score * 100, 1),
             }
 
-    # Nouzový fallback používá střed nalezeného nadpisu, takže funguje i při
-    # jiné šířce sloupců/zoomu než u předchozího screenshotu.
     center = (header_left + header_right) / 2
-    half = width * 0.145
-    left = max(0, center - half)
-    right = min(width - 1, center + half)
+    half = width * 0.15
     return {
-        "left": left,
-        "right": right,
-        "method": "header-fallback",
+        "left": max(0, center - half),
+        "right": min(width - 1, center + half),
+        "method": "header-center",
         "header_token": header.get("text", ""),
         "header_similarity": round(score * 100, 1),
     }
-
 
 def _work_extract_afternoons(words, model, source_name, image_width, region_left, region_right):
     target = "janvanek"
@@ -1060,14 +1048,17 @@ def _save_work_scan_log(source_name, width, height, model, region_left, region_r
 
 
 def _scan_work_image(image_path, source_name):
+    """Rychlý OCR průchod navržený pro Raspberry Pi: max. 2–3 běhy Tesseractu."""
     with Image.open(image_path) as image:
         width, height = image.size
-    date_words = _work_ocr_words(
+
+    overview_words = _work_ocr_words(
         image_path,
-        (0, 0, max(120, int(width * 0.12)), height),
-        requested_scale=4.2,
+        None,
+        requested_scale=2.45,
         psm=6,
     )
+    date_words = [word for word in overview_words if float(word.get("left", 0)) < width * 0.12]
     model = _work_row_model(date_words)
     if not model:
         return [], [{
@@ -1081,11 +1072,13 @@ def _scan_work_image(image_path, source_name):
             "decision": "model_dat",
             "accepted": False,
             "reason": "Nepodařilo se spolehlivě určit měsíc a řádky podle sloupce Datum.",
-        }], "", {"width": width, "height": height, "model": None, "left": None, "right": None, "region_method": None}
+        }], " ".join(word["text"] for word in overview_words)[:30000], {
+            "width": width, "height": height, "model": None, "left": None, "right": None,
+            "region_method": None,
+        }
 
-    top = max(0, int(model["day1_y"] - model["spacing"] * 2.5))
-    bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
-    region = _work_afternoon_region(image_path, width, height)
+    header_words = [word for word in overview_words if float(word.get("top", 0)) < height * 0.38]
+    region = _work_afternoon_region(image_path, width, height, header_words)
     if not region:
         return [], [{
             "token": "",
@@ -1098,29 +1091,41 @@ def _scan_work_image(image_path, source_name):
             "decision": "hlavicka_odpoledni",
             "accepted": False,
             "reason": "Řádky s daty byly nalezeny, ale OCR nenašlo hlavičku Odpolední směna.",
-        }], "", {"width": width, "height": height, "model": model, "left": None, "right": None, "region_method": "nenalezena-hlavicka"}
-    left = region["left"]
-    right = region["right"]
+        }], " ".join(word["text"] for word in overview_words)[:30000], {
+            "width": width, "height": height, "model": model, "left": None, "right": None,
+            "region_method": "nenalezena-hlavicka",
+        }
 
-    # Odpolední blok má v používané tabulce čtyři stejně široké sloupce.
-    # OCR po jednotlivých sloupcích výrazně omezuje rušení svislými čarami.
-    span = right - left
-    words = []
-    for column in range(4):
-        x1 = left + round(span * column / 4) + 3
-        x2 = left + round(span * (column + 1) / 4) - 3
-        if x2 <= x1:
-            continue
-        words.extend(_work_ocr_words(image_path, (x1, top, x2, bottom), requested_scale=6.0, psm=6))
-    # Jeden společný průchod zachytí případy, kdy OCR rozdělí jméno netypicky.
-    words.extend(_work_ocr_words(
+    left, right = region["left"], region["right"]
+    top = max(0, int(model["day1_y"] - model["spacing"] * 1.6))
+    bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 0.8)))
+    crop = (max(0, int(left) + 2), top, min(width, int(right) - 2), bottom)
+
+    afternoon_words = _work_ocr_words(
         image_path,
-        (min(width - 2, left + 2), top, max(left + 4, right - 2), bottom),
-        requested_scale=4.3,
+        crop,
+        requested_scale=5.0,
         psm=6,
-    ))
-    shifts, diagnostics = _work_extract_afternoons(words, model, source_name, width, left, right)
-    debug_text = " ".join(word["text"] for word in words)[:30000]
+    )
+    shifts, diagnostics = _work_extract_afternoons(
+        afternoon_words, model, source_name, width, left, right
+    )
+
+    if not shifts:
+        sparse_words = _work_ocr_words(
+            image_path,
+            crop,
+            requested_scale=5.0,
+            psm=11,
+        )
+        retry_shifts, retry_diagnostics = _work_extract_afternoons(
+            sparse_words, model, source_name, width, left, right
+        )
+        diagnostics.extend(retry_diagnostics)
+        if retry_shifts:
+            shifts = retry_shifts
+            afternoon_words.extend(sparse_words)
+
     diagnostics.insert(0, {
         "token": region.get("header_token", ""),
         "similarity": region.get("header_similarity"),
@@ -1131,8 +1136,9 @@ def _scan_work_image(image_path, source_name):
         "y_delta": None,
         "decision": "hranice_odpoledniho_bloku",
         "accepted": False,
-        "reason": "Blok odpolední směny určen podle hlavičky; metoda: " + region.get("method", "neznamá") + ".",
+        "reason": "Blok odpolední směny určen podle hlavičky; metoda: " + region.get("method", "neznámá") + ".",
     })
+    debug_text = " ".join(word["text"] for word in (overview_words + afternoon_words))[:30000]
     meta = {
         "width": width,
         "height": height,
@@ -1144,7 +1150,6 @@ def _scan_work_image(image_path, source_name):
         "header_similarity": region.get("header_similarity"),
     }
     return shifts, diagnostics, debug_text, meta
-
 
 def scan_work(original_name, body):
     if not body or len(body) > MAX_UPLOAD:
@@ -1175,7 +1180,7 @@ def scan_work(original_name, body):
             with Image.open(image_path) as image:
                 meta = {"width": image.width, "height": image.height, "model": None, "left": None, "right": None}
 
-        if not shifts:
+        if not shifts and mime == "application/pdf":
             try:
                 text = ocr_file(source, mime)
             except Exception:
