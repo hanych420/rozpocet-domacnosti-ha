@@ -264,12 +264,13 @@
     const allCalendars=['hanych','eva','spolecne','narozeniny','kumi'];
     const colorKeys=[...allCalendars,'svatky'];
     const defaultColors={hanych:'#60a5fa',eva:'#c084fc',spolecne:'#34d399',narozeniny:'#fb923c',kumi:'#6b7280',svatky:'#ef4444'};
+    const initialView=new URLSearchParams(location.search).get('view');
     const state={
       cursor:new Date(new Date().getFullYear(),new Date().getMonth(),1),
       events:[],
       filters:new Set(allCalendars),
       filterMode:'all',
-      view:'month',
+      view:initialView==='agenda'?'agenda':'month',
       editingId:null,
       autoBirthdayRecurrence:false,
       autoKumiTitle:false,
