@@ -690,19 +690,30 @@ def _work_norm_token(value):
 
 
 def _work_parse_date_token(value):
-    digits = re.sub(r"\D", "", str(value or ""))
-    if len(digits) not in {7, 8}:
+    raw = str(value or "").strip()
+    # Nejdřív respektujeme skutečné oddělovače. Původní parser odstraňoval
+    # tečky a z 10.9.2026 udělal 1.9.2026, což rozbilo model řádků.
+    match = re.search(r"(?<!\\d)([0-3]?\\d)[.\\-/:]([01]?\\d)[.\\-/:](20\\d{2}|\\d{2})(?!\\d)", raw)
+    if match:
+        try:
+            year = int(match.group(3))
+            if year < 100:
+                year += 2000
+            parsed = date(year, int(match.group(2)), int(match.group(1)))
+        except (ValueError, TypeError):
+            return None
+        return parsed if 2020 <= parsed.year <= 2100 else None
+
+    # Bez oddělovačů přijímáme jen osmimístné DDMMYYYY. Sedm číslic je
+    # nejednoznačných (např. 1092026 = 1.9. nebo 10.9.), proto je raději ignorujeme.
+    digits = re.sub(r"\\D", "", raw)
+    if len(digits) != 8:
         return None
     try:
-        year = int(digits[-4:])
-        month = int(digits[-6:-4])
-        day = int(digits[:-6])
-        parsed = date(year, month, day)
+        parsed = date(int(digits[4:]), int(digits[2:4]), int(digits[:2]))
     except (ValueError, TypeError):
         return None
-    if not 2020 <= parsed.year <= 2100:
-        return None
-    return parsed
+    return parsed if 2020 <= parsed.year <= 2100 else None
 
 
 def _work_ocr_words(image_path, crop_box=None, requested_scale=3.0, psm=6):
@@ -863,6 +874,87 @@ def _work_vertical_boundary(image_path, y1, y2, lo_ratio, hi_ratio, default_rati
         return min(strong, key=lambda item: (abs(item[0] - expected), -item[1]))[0]
 
 
+def _work_afternoon_region(image_path, width, height):
+    """Najde blok Odpolední směna podle hlavičky, ne podle pevného procenta šířky."""
+    header_bottom = min(height, max(180, int(height * 0.38)))
+    header_words = _work_ocr_words(
+        image_path,
+        (0, 0, width, header_bottom),
+        requested_scale=2.5,
+        psm=6,
+    )
+    target = "odpoledni"
+    candidates = []
+    for word in header_words:
+        token = _work_norm_token(word.get("text"))
+        if not token:
+            continue
+        score = difflib.SequenceMatcher(None, token, target).ratio()
+        if score >= 0.58:
+            candidates.append((score, word))
+    if not candidates:
+        return None
+
+    score, header = max(candidates, key=lambda item: item[0])
+    header_left = float(header["left"])
+    header_right = header_left + float(header["width"])
+    band_top = max(0, int(float(header["top"]) - 3))
+    band_bottom = min(height, int(float(header["top"]) + float(header["height"]) + 10))
+
+    with Image.open(image_path) as image:
+        gray = image.convert("L")
+        pixels = gray.load()
+        band_height = max(1, band_bottom - band_top)
+        threshold = max(5, int(band_height * 0.62))
+        strong_x = []
+        for x in range(width):
+            dark = 0
+            for y in range(band_top, band_bottom):
+                if pixels[x, y] < 130:
+                    dark += 1
+            if dark >= threshold:
+                strong_x.append(x)
+
+    clusters = []
+    if strong_x:
+        start = previous = strong_x[0]
+        for x in strong_x[1:]:
+            if x > previous + 1:
+                clusters.append((start, previous))
+                start = x
+            previous = x
+        clusters.append((start, previous))
+    centers = [(a + b) / 2 for a, b in clusters]
+
+    left_candidates = [x for x in centers if x < header_left - 40]
+    right_candidates = [x for x in centers if x > header_right + 40]
+    if left_candidates and right_candidates:
+        left = max(left_candidates)
+        right = min(right_candidates)
+        if right > left + width * 0.08:
+            return {
+                "left": left,
+                "right": right,
+                "method": "header",
+                "header_token": header.get("text", ""),
+                "header_similarity": round(score * 100, 1),
+            }
+
+    # Nouzový fallback používá střed nalezeného nadpisu, takže funguje i při
+    # jiné šířce sloupců/zoomu než u předchozího screenshotu.
+    center = (header_left + header_right) / 2
+    half = width * 0.145
+    left = max(0, center - half)
+    right = min(width - 1, center + half)
+    return {
+        "left": left,
+        "right": right,
+        "method": "header-fallback",
+        "header_token": header.get("text", ""),
+        "header_similarity": round(score * 100, 1),
+    }
+
+
 def _work_extract_afternoons(words, model, source_name, image_width, region_left, region_right):
     target = "janvanek"
     spacing = model["spacing"]
@@ -982,10 +1074,11 @@ def _scan_work_image(image_path, source_name):
 
     top = max(0, int(model["day1_y"] - model["spacing"] * 2.5))
     bottom = min(height, int(model["day1_y"] + model["spacing"] * (model["days"] + 1)))
-    left = _work_vertical_boundary(image_path, top, bottom, 0.54, 0.68, 0.615)
-    right = _work_vertical_boundary(image_path, top, bottom, 0.81, 0.93, 0.863)
-    if right <= left + width * 0.08:
-        left, right = int(width * 0.615), int(width * 0.863)
+    region = _work_afternoon_region(image_path, width, height)
+    if not region:
+        return [], [], "", {"width": width, "height": height, "model": model, "left": None, "right": None, "region_method": "nenalezena-hlavicka"}
+    left = region["left"]
+    right = region["right"]
 
     # Odpolední blok má v používané tabulce čtyři stejně široké sloupce.
     # OCR po jednotlivých sloupcích výrazně omezuje rušení svislými čarami.
@@ -1006,7 +1099,28 @@ def _scan_work_image(image_path, source_name):
     ))
     shifts, diagnostics = _work_extract_afternoons(words, model, source_name, width, left, right)
     debug_text = " ".join(word["text"] for word in words)[:30000]
-    meta = {"width": width, "height": height, "model": model, "left": left, "right": right}
+    diagnostics.insert(0, {
+        "token": region.get("header_token", ""),
+        "similarity": region.get("header_similarity"),
+        "ocr_confidence": None,
+        "x": None,
+        "x_percent": None,
+        "row_day": None,
+        "y_delta": None,
+        "decision": "hranice_odpoledniho_bloku",
+        "accepted": False,
+        "reason": "Blok odpolední směny určen podle hlavičky; metoda: " + region.get("method", "neznamá") + ".",
+    })
+    meta = {
+        "width": width,
+        "height": height,
+        "model": model,
+        "left": left,
+        "right": right,
+        "region_method": region.get("method"),
+        "header_token": region.get("header_token"),
+        "header_similarity": region.get("header_similarity"),
+    }
     return shifts, diagnostics, debug_text, meta
 
 
