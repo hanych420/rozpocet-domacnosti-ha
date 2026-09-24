@@ -147,7 +147,7 @@ def normalize_event(payload, existing=None):
         raise ValueError("Konec události nemůže být před začátkem.")
     if recurrence not in {"none", "yearly"}:
         raise ValueError("Neplatné opakování.")
-    if event_type not in {"", "zabava"}:
+    if event_type not in {"", "zabava", "prace"}:
         raise ValueError("Neplatný typ události.")
     if all_day:
         start_time = ""
