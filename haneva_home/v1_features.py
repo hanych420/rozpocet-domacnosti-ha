@@ -30,6 +30,7 @@ RECIPE_IMAGE_DIR = "/data/haneva_recipe_images"
 MAX_UPLOAD = 18 * 1024 * 1024
 RECIPE_IMAGE_ZIP_MAX = 80 * 1024 * 1024
 RECIPE_IMAGE_ZIP_UNPACKED_MAX = 220 * 1024 * 1024
+RECIPE_IMAGE_MAX = 15 * 1024 * 1024
 PERSONS = {"hanych", "eva"}
 RESET_DAY_DEFAULT = 6  # Sunday, Python weekday()
 SHIFT_VALUES = {"dopoledni", "odpoledni"}
@@ -939,6 +940,51 @@ def import_recipe_images_zip(original_name, body):
     if not imported:
         raise ValueError("V ZIPu se nepodařilo přiřadit žádný obrázek k receptu.")
     return {"count": len(imported), "imported": imported, "skipped": skipped}
+
+
+
+def save_recipe_image(recipe_id, original_name, body):
+    try:
+        recipe_id = int(recipe_id)
+    except (TypeError, ValueError):
+        raise ValueError("Neplatné ID receptu.")
+    if not body or len(body) > RECIPE_IMAGE_MAX:
+        raise ValueError("Obrázek může mít nejvýše 15 MB.")
+    suffix = Path(str(original_name or "")).suffix.lower()
+    if suffix not in {".png", ".jpg", ".jpeg", ".webp"}:
+        raise ValueError("Nahraj PNG, JPG nebo WebP obrázek.")
+
+    with db() as conn:
+        exists = conn.execute("SELECT 1 FROM recipes WHERE id=? AND active=1", (recipe_id,)).fetchone()
+    if not exists:
+        raise KeyError("Recept nebyl nalezen.")
+
+    try:
+        with Image.open(BytesIO(body)) as image:
+            image.load()
+            if image.width < 128 or image.height < 128:
+                raise ValueError("Obrázek je příliš malý.")
+            if image.width * image.height > 40_000_000:
+                raise ValueError("Obrázek má příliš vysoké rozlišení.")
+            image = image.convert("RGB")
+            image.thumbnail((1600, 1600), getattr(Image, "Resampling", Image).LANCZOS)
+            stored_name = f"recipe-{recipe_id}.webp"
+            target = Path(RECIPE_IMAGE_DIR) / stored_name
+            image.save(target, "WEBP", quality=88, method=4)
+    except ValueError:
+        raise
+    except Exception as exc:
+        raise ValueError(f"Obrázek nelze zpracovat: {exc}")
+
+    image_url = f"/api/v1/recipe-images/{stored_name}"
+    with db() as conn:
+        conn.execute(
+            "UPDATE recipes SET image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+            (image_url, recipe_id),
+        )
+        conn.commit()
+        row = conn.execute("SELECT * FROM recipes WHERE id=?", (recipe_id,)).fetchone()
+    return recipe_dict(row)
 
 
 def read_recipe_image(filename):

@@ -399,6 +399,20 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         path = urlparse(self.path).path
 
         try:
+            match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)/image", path)
+            if match:
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > v1_features.RECIPE_IMAGE_MAX:
+                    raise ValueError("Obrázek chybí nebo je příliš velký.")
+                filename = unquote(self.headers.get("X-Filename", "recipe-image.jpg"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Obrázek nebyl nahrán celý.")
+                self.send_json({"recipe": v1_features.save_recipe_image(int(match.group(1)), filename, body)}, 201)
+                return
             if path == "/api/v1/recipes":
                 self.send_json({"recipe": v1_features.save_recipe(self.read_json())}, 201)
                 return
