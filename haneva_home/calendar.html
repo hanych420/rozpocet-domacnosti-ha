@@ -24,7 +24,7 @@
     .brand{display:flex;align-items:center;gap:12px;color:inherit;text-decoration:none;font-weight:800}
     .brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:#111827;color:#fff}
     .back{display:inline-flex;align-items:center;gap:8px;color:#596174;text-decoration:none;font-size:14px;font-weight:700}
-    .head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px}
+    .head{display:flex;align-items:flex-end;justify-content:space-between;gap:18px;margin-bottom:22px}.head-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap;justify-content:flex-end}.import-work{border:1px solid var(--line);border-radius:15px;background:#fff;color:#475569;padding:12px 15px;font-weight:800;display:inline-flex;align-items:center;gap:8px}
     .head h1{margin:0 0 5px;font-size:clamp(36px,6vw,62px);line-height:1;letter-spacing:-.05em}
     .head p{margin:0;color:var(--muted);font-size:16px}
     .primary{border:0;border-radius:15px;background:#111827;color:#fff;padding:13px 18px;font-weight:800;box-shadow:0 10px 24px rgba(17,24,39,.16);display:inline-flex;align-items:center;gap:8px}
@@ -46,7 +46,7 @@
     .filter-check{display:none;font-size:12px;font-weight:900;color:#111827}
     .filter.selected .filter-check{display:inline}
     .filter-dot{width:9px;height:9px;border-radius:50%}
-    .filter-dot.hanych{background:var(--hanych)}.filter-dot.eva{background:var(--eva)}.filter-dot.spolecne{background:var(--spolecne)}.filter-dot.narozeniny{background:var(--narozeniny)}.filter-dot.kumi{background:var(--kumi)}
+    .filter-dot.hanych{background:var(--hanych)}.filter-dot.prace{background:#64748b}.filter-dot.eva{background:var(--eva)}.filter-dot.spolecne{background:var(--spolecne)}.filter-dot.narozeniny{background:var(--narozeniny)}.filter-dot.kumi{background:var(--kumi)}
 
     .gesture-hint{padding:8px 18px;border-bottom:1px solid var(--line);background:#fbfcfe;color:#8a92a0;font-size:12px;font-weight:650}
     .weekdays{display:grid;grid-template-columns:repeat(7,1fr);border-bottom:1px solid var(--line)}
@@ -67,7 +67,7 @@
     .event.spolecne{background:var(--spolecne-bg);border-left:3px solid var(--spolecne)}
     .event.narozeniny{background:var(--narozeniny-bg);border-left:3px solid var(--narozeniny)}
     .event.kumi{background:var(--kumi-bg);border-left:3px solid var(--kumi)}
-    .event.svatky{background:var(--svatky-bg);border-left:3px solid var(--svatky);cursor:default}
+    .event.svatky{background:var(--svatky-bg);border-left:3px solid var(--svatky);cursor:default}.event.work{width:max-content;max-width:100%;padding:2px 7px;margin-top:2px;border-radius:999px;border-left:0;background:#eef2f7;color:#536071;font-size:10px;line-height:1.3;font-weight:800;box-shadow:inset 0 0 0 1px #e2e8f0}.event.work::before{content:'• ';color:var(--hanych)}
     .event.dragging{opacity:.42;transform:scale(.98)}
     .more{border:0;background:transparent;color:#6b7280;padding:4px 2px;font-size:11px;font-weight:750}
     .more:hover{color:#111827}
@@ -75,7 +75,7 @@
     .agenda{padding:10px 18px 18px;display:none}
     .agenda.active{display:block}
     .agenda-list{display:flex;flex-direction:column;gap:8px}
-    .agenda-event{display:flex;align-items:stretch;gap:10px;width:100%;border:1px solid #eef0f4;border-radius:14px;padding:10px 12px;background:#fff;text-align:left;box-shadow:0 4px 12px rgba(31,41,55,.04)}
+    .agenda-event{display:flex;align-items:stretch;gap:10px;width:100%;border:1px solid #eef0f4;border-radius:14px;padding:10px 12px;background:#fff;text-align:left;box-shadow:0 4px 12px rgba(31,41,55,.04)}.agenda-event.work{padding:6px 10px;background:#f8fafc;box-shadow:none;border-radius:10px}.agenda-event.work .agenda-bar{min-height:26px}.agenda-event.work .agenda-title{font-size:12px}.agenda-event.work .agenda-meta{font-size:10px}
     .agenda-date-range{width:112px;flex:0 0 auto;display:flex;align-items:center;font-size:13px;font-weight:850;color:#4b5563;line-height:1.25}
     .agenda-bar{width:4px;min-height:40px;border-radius:4px;flex:0 0 auto}
     .agenda-bar.hanych{background:var(--hanych)}.agenda-bar.eva{background:var(--eva)}.agenda-bar.spolecne{background:var(--spolecne)}.agenda-bar.narozeniny{background:var(--narozeniny)}.agenda-bar.kumi{background:var(--kumi)}
@@ -142,7 +142,7 @@
     .settings-actions-right{display:flex;gap:9px}
 
     .toast{position:fixed;right:18px;bottom:18px;z-index:20;background:#111827;color:#fff;border-radius:13px;padding:11px 14px;font-size:13px;font-weight:700;box-shadow:0 12px 34px rgba(17,24,39,.24);opacity:0;transform:translateY(10px);pointer-events:none;transition:.2s}
-    .toast.show{opacity:1;transform:translateY(0)}
+    .toast.show{opacity:1;transform:translateY(0)}.work-import-copy{margin:0 0 12px;color:#6b7280;font-size:13px;line-height:1.5}.work-import-summary{padding:11px 12px;border-radius:12px;background:#f8fafc;color:#475569;font-size:13px;font-weight:750}.work-import-dates{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px}.work-import-date{display:inline-flex;padding:6px 9px;border-radius:999px;background:#eef2f7;color:#475569;font-size:11px;font-weight:800}.work-import-status{margin-top:10px;color:#6b7280;font-size:12px}
     body.gesture-active{user-select:none;-webkit-user-select:none}
 
     @media(max-width:760px){
@@ -176,15 +176,15 @@
 <body>
   <main class="wrap">
     <div class="topbar"><a class="brand" href="/"><span class="brand-mark">H</span><span>Haneva</span></a><a class="back" href="/">← Zpět na přehled</a></div>
-    <section class="head"><div><h1>Kalendář</h1><p>Co čeká Hanycha, Evu a nás oba.</p></div><button class="primary" id="newEvent">＋ Přidat událost</button></section>
+    <section class="head"><div><h1>Kalendář</h1><p>Co čeká Hanycha, Evu a nás oba.</p></div><div class="head-actions"><button class="import-work" id="importWork" type="button">⇧ Import práce</button><input id="workFile" type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden><button class="primary" id="newEvent">＋ Přidat událost</button></div></section>
 
     <section class="panel">
       <div class="toolbar">
-        <div class="view-toggle"><button class="month-button" data-view="month">Měsíc</button><button class="agenda-button" data-view="agenda">Agenda</button><button type="button" onclick="location.href=&quot;/kalendar/prace&quot;">Práce</button></div>
+        <div class="view-toggle"><button class="month-button" data-view="month">Měsíc</button><button class="agenda-button" data-view="agenda">Agenda</button></div>
         <div class="nav"><button class="icon-btn" id="prevMonth">←</button><button id="todayButton">Dnes</button><div class="month-title" id="monthTitle"></div><button class="icon-btn" id="nextMonth">→</button></div>
       </div>
       <div class="filters" id="filters">
-        <button class="filter active" data-calendar="hanych"><span class="filter-dot hanych"></span>Hanych<span class="filter-check">✓</span></button>
+        <button class="filter active" data-calendar="hanych"><span class="filter-dot hanych"></span>Hanych<span class="filter-check">✓</span></button><button class="filter active" data-calendar="prace"><span class="filter-dot prace"></span>Práce<span class="filter-check">✓</span></button>
         <button class="filter active" data-calendar="eva"><span class="filter-dot eva"></span>Eva<span class="filter-check">✓</span></button>
         <button class="filter active" data-calendar="spolecne"><span class="filter-dot spolecne"></span>Společné<span class="filter-check">✓</span></button>
         <button class="filter active" data-calendar="narozeniny"><span class="filter-dot narozeniny"></span>Narozeniny<span class="filter-check">✓</span></button>
@@ -207,7 +207,7 @@
       <div class="field full"><label for="title">Název</label><input id="title" required maxlength="200" placeholder="Např. koncert, návštěva, zubař…"></div>
       <div class="field"><label for="calendar">Kalendář</label><select id="calendar"><option value="hanych">Hanych</option><option value="eva">Eva</option><option value="spolecne" selected>Společné</option><option value="narozeniny">Narozeniny</option><option value="kumi">🐕 Hlídání Kumi</option></select></div>
       <div class="field"><label for="recurrence">Opakování</label><select id="recurrence"><option value="none">Neopakovat</option><option value="yearly">Každý rok</option></select></div>
-      <div class="field full"><label for="eventType">Typ události</label><select id="eventType"><option value="">Běžná událost</option><option value="zabava">🎟️ Zábava – divadlo, koncert…</option></select></div>
+      <div class="field full"><label for="eventType">Typ události</label><select id="eventType"><option value="">Běžná událost</option><option value="prace">Práce</option><option value="zabava">🎟️ Zábava – divadlo, koncert…</option></select></div>
       <div class="field"><label for="startDate">Od</label><input id="startDate" type="date" required></div>
       <div class="field"><label for="endDate">Do</label><input id="endDate" type="date" required></div>
       <div class="field full"><label class="checkline"><input id="allDay" type="checkbox" checked> Celý den</label></div>
@@ -227,6 +227,17 @@
     </div>
     <div class="actions"><button class="danger" type="button" id="deleteEvent">Smazat</button><div class="actions-right"><button class="secondary" type="button" id="cancelDialog">Zrušit</button><button class="save" type="submit">Uložit</button></div></div>
   </form></dialog>
+
+  <dialog id="workImportDialog">
+    <div class="modal">
+      <div class="modal-head"><h2>Import práce</h2><button class="close" type="button" id="closeWorkImport" aria-label="Zavřít">×</button></div>
+      <p class="work-import-copy">Haneva v listu „Směny“ najde Jana Vaňka pouze v části <strong>Odpolední směna</strong>. Směny uloží pod Hanych jako malé události „Odpolední“. Opakovaný import stejného měsíce předchozí pracovní import aktualizuje.</p>
+      <div class="work-import-summary" id="workImportSummary">Vyber XLSX soubor se směnami.</div>
+      <div class="work-import-dates" id="workImportDates"></div>
+      <div class="work-import-status" id="workImportStatus"></div>
+      <div class="actions"><span></span><div class="actions-right"><button class="secondary" type="button" id="cancelWorkImport">Zrušit</button><button class="save" type="button" id="confirmWorkImport" disabled>Importovat do kalendáře</button></div></div>
+    </div>
+  </dialog>
 
   <dialog id="ticketDialog">
     <div class="ticket-viewer">
