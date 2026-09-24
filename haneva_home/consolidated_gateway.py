@@ -267,6 +267,17 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         if path == "/api/v1/recipes":
             self.send_json({"recipes": v1_features.list_recipes()})
             return
+        if path == "/api/v1/recipes/image-export":
+            self.send_json({"recipes": v1_features.recipe_image_manifest()})
+            return
+        if path.startswith("/api/v1/recipe-images/"):
+            filename = unquote(path.rsplit("/", 1)[-1])
+            try:
+                body, mime = v1_features.read_recipe_image(filename)
+                self.send_bytes(body, 200, mime)
+            except FileNotFoundError:
+                self.send_json({"error": "Obrázek nebyl nalezen."}, 404)
+            return
         if path == "/api/v1/planned":
             self.send_json(v1_features.planned_recipes())
             return
@@ -368,6 +379,34 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         try:
             if path == "/api/v1/recipes":
                 self.send_json({"recipe": v1_features.save_recipe(self.read_json())}, 201)
+                return
+            if path == "/api/v1/recipes/import-csv/preview":
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > v1_features.MAX_UPLOAD:
+                    raise ValueError("CSV chybí nebo je příliš velké.")
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("CSV nebylo nahráno celé.")
+                self.send_json(v1_features.preview_recipe_csv(body))
+                return
+            if path == "/api/v1/recipes/import-csv/commit":
+                self.send_json(v1_features.commit_recipe_import(self.read_json()), 201)
+                return
+            if path == "/api/v1/recipe-images/import-zip":
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > v1_features.RECIPE_IMAGE_ZIP_MAX:
+                    raise ValueError("ZIP chybí nebo je příliš velký.")
+                filename = unquote(self.headers.get("X-Filename", "recepty-obrazky.zip"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("ZIP nebyl nahrán celý.")
+                self.send_json(v1_features.import_recipe_images_zip(filename, body), 201)
                 return
             if path == "/api/v1/tinder/vote":
                 payload = self.read_json()

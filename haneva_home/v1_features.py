@@ -1,8 +1,9 @@
 from datetime import date, datetime, timedelta, timezone
 from http.client import HTTPConnection
 from pathlib import Path
-from io import BytesIO
+from io import BytesIO, StringIO
 import calendar
+import csv
 import difflib
 import json
 import os
@@ -24,7 +25,10 @@ import shopping
 
 DB_PATH = "/data/haneva_v1.db"
 RECEIPT_DIR = "/data/haneva_receipts"
+RECIPE_IMAGE_DIR = "/data/haneva_recipe_images"
 MAX_UPLOAD = 18 * 1024 * 1024
+RECIPE_IMAGE_ZIP_MAX = 80 * 1024 * 1024
+RECIPE_IMAGE_ZIP_UNPACKED_MAX = 220 * 1024 * 1024
 PERSONS = {"hanych", "eva"}
 RESET_DAY_DEFAULT = 6  # Sunday, Python weekday()
 SHIFT_VALUES = {"dopoledni", "odpoledni"}
@@ -43,6 +47,7 @@ def db():
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     Path(RECEIPT_DIR).mkdir(parents=True, exist_ok=True)
+    Path(RECIPE_IMAGE_DIR).mkdir(parents=True, exist_ok=True)
     with db() as conn:
         conn.executescript("""
         CREATE TABLE IF NOT EXISTS settings(
@@ -285,6 +290,252 @@ def delete_recipe(recipe_id):
         conn.commit()
     if not cur.rowcount:
         raise KeyError("Recept nebyl nalezen.")
+
+
+
+def recipe_image_manifest():
+    """Data určená pro export do ChatGPT / generátoru obrázků."""
+    rows = []
+    for recipe in list_recipes():
+        ingredients_text = "\n".join(
+            f"{item['name']}" + (f" | {item['quantity']}" if item.get("quantity") else "")
+            for item in recipe.get("ingredients", [])
+        )
+        rows.append({
+            "recipe_id": recipe["id"],
+            "title": recipe["title"],
+            "description": recipe.get("description", ""),
+            "servings": recipe.get("servings", 2),
+            "ingredients": ingredients_text,
+            "image_filename": f"recipe-{recipe['id']}.png",
+            "has_image": bool(recipe.get("image_url")),
+        })
+    return rows
+
+
+def _decode_recipe_csv(body):
+    if not body or len(body) > MAX_UPLOAD:
+        raise ValueError("CSV může mít nejvýše 18 MB.")
+    text = None
+    for encoding in ("utf-8-sig", "utf-8", "cp1250"):
+        try:
+            text = body.decode(encoding)
+            break
+        except UnicodeDecodeError:
+            continue
+    if text is None:
+        raise ValueError("CSV se nepodařilo přečíst. Použij UTF-8 nebo Windows-1250.")
+    return text
+
+
+def _recipe_csv_header(row):
+    aliases = {
+        "title": {"nazev", "název", "title", "recept"},
+        "description": {"popis", "description"},
+        "servings": {"porce", "servings", "pocet porci", "počet porcí"},
+        "ingredients": {"ingredience", "ingredients", "suroviny"},
+        "instructions": {"postup", "instructions", "priprava", "příprava"},
+    }
+    normalized = {}
+    for key, value in row.items():
+        clean_key = norm(key)
+        for target, names in aliases.items():
+            if clean_key in {norm(name) for name in names}:
+                normalized[target] = value
+                break
+    return normalized
+
+
+def _parse_import_ingredients(value):
+    out = []
+    for raw in str(value or "").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        raw = raw.strip()
+        if not raw:
+            continue
+        name, quantity = raw, ""
+        if " | " in raw:
+            name, quantity = raw.split(" | ", 1)
+        elif " – " in raw:
+            name, quantity = raw.split(" – ", 1)
+        elif " - " in raw:
+            name, quantity = raw.split(" - ", 1)
+        name, quantity = _clean(name, 160), _clean(quantity, 80)
+        if name:
+            out.append({"name": name, "quantity": quantity})
+        if len(out) >= 80:
+            break
+    return out
+
+
+def preview_recipe_csv(body):
+    text = _decode_recipe_csv(body)
+    try:
+        dialect = csv.Sniffer().sniff(text[:8000], delimiters=";,\t")
+    except csv.Error:
+        dialect = csv.excel
+        dialect.delimiter = ";"
+    reader = csv.DictReader(StringIO(text), dialect=dialect)
+    if not reader.fieldnames:
+        raise ValueError("CSV nemá hlavičku.")
+    with db() as conn:
+        existing = {
+            norm(row["title"])
+            for row in conn.execute("SELECT title FROM recipes WHERE active=1").fetchall()
+        }
+    recipes = []
+    skipped = []
+    for number, row in enumerate(reader, start=2):
+        mapped = _recipe_csv_header(row)
+        title = _clean(mapped.get("title"), 180)
+        if not title:
+            if any(str(value or "").strip() for value in row.values()):
+                skipped.append({"row": number, "reason": "Chybí název."})
+            continue
+        try:
+            servings = max(1, min(int(str(mapped.get("servings") or "2").strip()), 30))
+        except ValueError:
+            servings = 2
+        payload = {
+            "title": title,
+            "description": _clean(mapped.get("description"), 1000),
+            "servings": servings,
+            "ingredients": _parse_import_ingredients(mapped.get("ingredients")),
+            "instructions": str(mapped.get("instructions") or "").strip()[:12000],
+        }
+        duplicate = norm(title) in existing
+        recipes.append({**payload, "duplicate": duplicate, "selected": not duplicate})
+    if not recipes:
+        raise ValueError("V CSV nebyl nalezen žádný recept.")
+    return {
+        "recipes": recipes,
+        "count": len(recipes),
+        "new_count": sum(1 for item in recipes if not item["duplicate"]),
+        "duplicate_count": sum(1 for item in recipes if item["duplicate"]),
+        "skipped": skipped,
+    }
+
+
+def commit_recipe_import(payload):
+    items = payload.get("recipes") or []
+    imported = []
+    skipped = []
+    with db() as conn:
+        existing = {
+            norm(row["title"])
+            for row in conn.execute("SELECT title FROM recipes WHERE active=1").fetchall()
+        }
+    for index, item in enumerate(items[:500], start=1):
+        if not isinstance(item, dict) or not item.get("selected", True):
+            continue
+        title = _clean(item.get("title"), 180)
+        if not title:
+            skipped.append({"index": index, "reason": "Chybí název."})
+            continue
+        if norm(title) in existing:
+            skipped.append({"title": title, "reason": "Recept už existuje."})
+            continue
+        recipe = save_recipe(item)
+        existing.add(norm(title))
+        imported.append({"id": recipe["id"], "title": recipe["title"]})
+    return {"imported": imported, "count": len(imported), "skipped": skipped}
+
+
+def _recipe_image_id_from_filename(filename):
+    stem = Path(filename).stem.lower()
+    match = re.match(r"^(?:recipe[-_ ]?)?(\d+)(?:[-_ .]|$)", stem)
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def import_recipe_images_zip(original_name, body):
+    if not body or len(body) > RECIPE_IMAGE_ZIP_MAX:
+        raise ValueError("ZIP s obrázky může mít nejvýše 80 MB.")
+    if not str(original_name or "").lower().endswith(".zip") or not body.startswith(b"PK"):
+        raise ValueError("Nahraj ZIP soubor s obrázky.")
+    try:
+        archive = zipfile.ZipFile(BytesIO(body))
+    except zipfile.BadZipFile:
+        raise ValueError("Soubor není platný ZIP.")
+
+    allowed = {".png", ".jpg", ".jpeg", ".webp"}
+    with db() as conn:
+        active_ids = {
+            int(row["id"])
+            for row in conn.execute("SELECT id FROM recipes WHERE active=1").fetchall()
+        }
+
+    imported = []
+    skipped = []
+    total_unpacked = 0
+    seen_ids = set()
+    with archive:
+        files = [entry for entry in archive.infolist() if not entry.is_dir()]
+        if len(files) > 400:
+            raise ValueError("ZIP obsahuje příliš mnoho souborů.")
+        for entry in files:
+            name = Path(entry.filename).name
+            suffix = Path(name).suffix.lower()
+            if suffix not in allowed:
+                continue
+            total_unpacked += int(entry.file_size or 0)
+            if total_unpacked > RECIPE_IMAGE_ZIP_UNPACKED_MAX:
+                raise ValueError("Rozbalený ZIP je příliš velký.")
+            recipe_id = _recipe_image_id_from_filename(name)
+            if recipe_id is None:
+                skipped.append({"file": name, "reason": "Název nezačíná ID receptu (např. recipe-12.png)."})
+                continue
+            if recipe_id not in active_ids:
+                skipped.append({"file": name, "reason": f"Recept ID {recipe_id} neexistuje."})
+                continue
+            if recipe_id in seen_ids:
+                skipped.append({"file": name, "reason": f"Pro recept ID {recipe_id} už byl v ZIPu použit jiný obrázek."})
+                continue
+            if entry.file_size > 15 * 1024 * 1024:
+                skipped.append({"file": name, "reason": "Obrázek je větší než 15 MB."})
+                continue
+            try:
+                raw = archive.read(entry)
+                with Image.open(BytesIO(raw)) as image:
+                    image.load()
+                    if image.width < 128 or image.height < 128:
+                        raise ValueError("Obrázek je příliš malý.")
+                    if image.width * image.height > 40_000_000:
+                        raise ValueError("Obrázek má příliš vysoké rozlišení.")
+                    image = image.convert("RGB")
+                    image.thumbnail((1600, 1600), getattr(Image, "Resampling", Image).LANCZOS)
+                    stored_name = f"recipe-{recipe_id}.webp"
+                    target = Path(RECIPE_IMAGE_DIR) / stored_name
+                    image.save(target, "WEBP", quality=88, method=4)
+            except Exception as exc:
+                skipped.append({"file": name, "reason": f"Obrázek nelze zpracovat: {exc}"})
+                continue
+            image_url = f"/api/v1/recipe-images/{stored_name}"
+            with db() as conn:
+                conn.execute(
+                    "UPDATE recipes SET image_url=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (image_url, recipe_id),
+                )
+                conn.commit()
+            seen_ids.add(recipe_id)
+            imported.append({"recipe_id": recipe_id, "file": name, "image_url": image_url})
+
+    if not imported:
+        raise ValueError("V ZIPu se nepodařilo přiřadit žádný obrázek k receptu.")
+    return {"count": len(imported), "imported": imported, "skipped": skipped}
+
+
+def read_recipe_image(filename):
+    safe = Path(str(filename or "")).name
+    if not re.fullmatch(r"recipe-\d+\.webp", safe):
+        raise FileNotFoundError("Obrázek nebyl nalezen.")
+    path = Path(RECIPE_IMAGE_DIR) / safe
+    if not path.exists() or not path.is_file():
+        raise FileNotFoundError("Obrázek nebyl nalezen.")
+    return path.read_bytes(), "image/webp"
 
 
 def _ensure_plan_if_match(conn, recipe_id, ckey):
