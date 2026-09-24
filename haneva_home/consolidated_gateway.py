@@ -293,6 +293,9 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 limit = 10
             self.send_json({"scans": v1_features.work_scan_logs(limit)})
             return
+        if path == "/api/v1/work/health":
+            self.send_json(v1_features.work_ocr_health())
+            return
         if path == "/api/v1/insights":
             self.send_json(v1_features.finance_insights())
             return
