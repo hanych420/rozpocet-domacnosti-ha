@@ -329,7 +329,11 @@ def recipe_image_manifest():
         )
         rows.append({
             "recipe_id": recipe["id"],
+            "external_id": recipe.get("external_id", ""),
             "title": recipe["title"],
+            "recipe_type": recipe.get("recipe_type", ""),
+            "lunchbox": recipe.get("lunchbox", ""),
+            "prep_time": recipe.get("prep_time", ""),
             "description": recipe.get("description", ""),
             "servings": recipe.get("servings", 2),
             "ingredients": ingredients_text,
@@ -464,6 +468,389 @@ def commit_recipe_import(payload):
         existing.add(norm(title))
         imported.append({"id": recipe["id"], "title": recipe["title"]})
     return {"imported": imported, "count": len(imported), "skipped": skipped}
+
+
+
+def _xlsx_col_letter(number):
+    value = int(number)
+    out = ""
+    while value > 0:
+        value, remainder = divmod(value - 1, 26)
+        out = chr(65 + remainder) + out
+    return out or "A"
+
+
+def _simple_xlsx_bytes(sheet_name, rows, widths=None):
+    """Vytvoří malý uživatelsky příjemný XLSX bez externích knihoven."""
+    rows = list(rows or [])
+    widths = list(widths or [])
+    max_cols = max((len(row) for row in rows), default=1)
+    if len(widths) < max_cols:
+        widths += [18] * (max_cols - len(widths))
+
+    def cell_xml(row_no, col_no, value, style=0):
+        ref = f"{_xlsx_col_letter(col_no)}{row_no}"
+        style_attr = f' s="{style}"' if style else ""
+        if value is None:
+            return f'<c r="{ref}"{style_attr}/>'
+        if isinstance(value, bool):
+            return f'<c r="{ref}" t="b"{style_attr}><v>{1 if value else 0}</v></c>'
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return f'<c r="{ref}"{style_attr}><v>{value}</v></c>'
+        text = xml_escape(str(value), {'"': '&quot;'})
+        return f'<c r="{ref}" t="inlineStr"{style_attr}><is><t xml:space="preserve">{text}</t></is></c>'
+
+    sheet_rows = []
+    for row_no, row in enumerate(rows, start=1):
+        cells = "".join(cell_xml(row_no, col_no, value, 1 if row_no == 1 else 2)
+                        for col_no, value in enumerate(row, start=1))
+        height = ' ht="28" customHeight="1"' if row_no == 1 else ""
+        sheet_rows.append(f'<row r="{row_no}"{height}>{cells}</row>')
+
+    cols_xml = "".join(
+        f'<col min="{index}" max="{index}" width="{max(8, min(float(width), 45))}" customWidth="1"/>'
+        for index, width in enumerate(widths[:max_cols], start=1)
+    )
+    last_ref = f"{_xlsx_col_letter(max_cols)}{max(1, len(rows))}"
+    sheet_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>
+  <cols>{cols_xml}</cols>
+  <sheetData>{"".join(sheet_rows)}</sheetData>
+  <autoFilter ref="A1:{last_ref}"/>
+</worksheet>'''
+    styles_xml = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <fonts count="2">
+    <font><sz val="11"/><name val="Aptos"/></font>
+    <font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Aptos"/></font>
+  </fonts>
+  <fills count="3">
+    <fill><patternFill patternType="none"/></fill>
+    <fill><patternFill patternType="gray125"/></fill>
+    <fill><patternFill patternType="solid"><fgColor rgb="FF172033"/><bgColor indexed="64"/></patternFill></fill>
+  </fills>
+  <borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+  <cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+  <cellXfs count="3">
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+    <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>
+    <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>
+  </cellXfs>
+  <cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>
+</styleSheet>'''
+    safe_sheet = xml_escape(str(sheet_name or "Recepty")[:31], {'"': '&quot;'})
+    workbook_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets><sheet name="{safe_sheet}" sheetId="1" r:id="rId1"/></sheets>
+</workbook>'''
+    workbook_rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>'''
+    root_rels = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>'''
+    content_types = '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+</Types>'''
+
+    out = BytesIO()
+    with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("[Content_Types].xml", content_types)
+        archive.writestr("_rels/.rels", root_rels)
+        archive.writestr("xl/workbook.xml", workbook_xml)
+        archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+        archive.writestr("xl/styles.xml", styles_xml)
+        archive.writestr("xl/worksheets/sheet1.xml", sheet_xml)
+    return out.getvalue()
+
+
+def recipe_template_xlsx():
+    headers = [
+        "ID", "Název", "Typ", "Do krabičky", "Doba přípravy",
+        "Popis", "Porce", "Postup",
+        "Ingredience 1", "Ingredience 2", "Ingredience 3", "Ingredience 4",
+        "Ingredience 5", "Ingredience 6",
+    ]
+    example = [
+        "R001", "Kuře na paprice", "Kuřecí", "Vhodné", "45 min",
+        "Krémová klasika", 4, "Orestuj cibuli, přidej kuře a duste do měkka.",
+        "Kuřecí prsa | 600 g", "Cibule | 2 ks", "Paprika | 2 lžičky",
+        "Smetana | 250 ml", "Rýže | 300 g", "",
+    ]
+    return _simple_xlsx_bytes(
+        "Recepty", [headers, example],
+        [12, 28, 18, 16, 16, 30, 10, 42, 24, 24, 24, 24, 24, 24],
+    )
+
+
+def recipe_image_export_xlsx():
+    rows = [[
+        "recipe_id", "ID", "Název", "Typ", "Do krabičky", "Doba přípravy",
+        "Popis", "Porce", "Ingredience", "image_filename", "has_image",
+    ]]
+    for recipe in recipe_image_manifest():
+        rows.append([
+            recipe["recipe_id"],
+            recipe.get("external_id", ""),
+            recipe["title"],
+            recipe.get("recipe_type", ""),
+            recipe.get("lunchbox", ""),
+            recipe.get("prep_time", ""),
+            recipe.get("description", ""),
+            recipe.get("servings", 2),
+            recipe.get("ingredients", ""),
+            recipe["image_filename"],
+            "ano" if recipe.get("has_image") else "ne",
+        ])
+    return _simple_xlsx_bytes(
+        "Obrázky", rows,
+        [12, 12, 30, 18, 16, 16, 32, 10, 42, 24, 12],
+    )
+
+
+def _recipe_xlsx_headers(cells):
+    aliases = {
+        "external_id": {"id", "id receptu", "recipe id", "recipe_id"},
+        "title": {"nazev", "název", "title", "recept"},
+        "recipe_type": {"typ", "type"},
+        "lunchbox": {"do krabicky", "do krabičky", "krabicka", "krabička"},
+        "prep_time": {"doba pripravy", "doba přípravy", "cas pripravy", "čas přípravy"},
+        "description": {"popis", "description"},
+        "servings": {"porce", "servings", "pocet porci", "počet porcí"},
+        "instructions": {"postup", "instructions", "priprava", "příprava"},
+    }
+    alias_norm = {key: {norm(value) for value in values} for key, values in aliases.items()}
+    rows = sorted({row for row, _ in cells})
+    for row in rows:
+        values = {col: str(cells.get((row, col), "") or "").strip() for _, col in cells if _ == row}
+        mapped = {}
+        ingredient_cols = []
+        for col, value in values.items():
+            clean = norm(value)
+            for key, names in alias_norm.items():
+                if clean in names and key not in mapped:
+                    mapped[key] = col
+                    break
+            if clean == "ingredience" or clean.startswith("ingredience ") or clean == "ingredients" or clean.startswith("ingredients "):
+                ingredient_cols.append(col)
+        if "title" in mapped:
+            if not ingredient_cols:
+                ingredient_start = None
+            else:
+                ingredient_start = min(ingredient_cols)
+            return row, mapped, sorted(ingredient_cols), ingredient_start
+    return None, {}, [], None
+
+
+def preview_recipe_xlsx(original_name, body):
+    if not body or len(body) > MAX_UPLOAD:
+        raise ValueError("Excel soubor může mít nejvýše 18 MB.")
+    name = str(original_name or "").lower()
+    if name.endswith(".xls"):
+        raise ValueError("Starý formát .xls není podporovaný. V Google Sheets nebo Excelu ho ulož jako .xlsx.")
+    if not name.endswith(".xlsx") or not body.startswith(b"PK"):
+        raise ValueError("Nahraj Excel soubor .xlsx.")
+    try:
+        archive = zipfile.ZipFile(BytesIO(body))
+    except zipfile.BadZipFile:
+        raise ValueError("Soubor není platný XLSX.")
+
+    with archive:
+        shared = _xlsx_shared_strings(archive)
+        sheet_path, sheet_name = _xlsx_sheet_path(archive, "Recepty")
+        root = ET.fromstring(archive.read(sheet_path))
+        ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+        cells = {}
+        max_col = 0
+        max_row = 0
+        for cell in root.findall(".//x:sheetData/x:row/x:c", ns):
+            ref = cell.attrib.get("r", "")
+            match = re.match(r"([A-Z]+)(\d+)", ref)
+            if not match:
+                continue
+            col = _xlsx_col_number(match.group(1))
+            row = int(match.group(2))
+            cells[(row, col)] = _xlsx_cell_value(cell, shared)
+            max_col = max(max_col, col or 0)
+            max_row = max(max_row, row)
+
+    header_row, mapped, ingredient_cols, ingredient_start = _recipe_xlsx_headers(cells)
+    if not header_row or "title" not in mapped:
+        raise ValueError("V tabulce se nepodařilo najít sloupec Název.")
+    if "external_id" not in mapped:
+        raise ValueError("Chybí sloupec ID. Přidej ke každému receptu stabilní ID, např. R001, R002…")
+
+    # Tvoje Kuchařka má jen první hlavičku „Ingredience“ a další ingredience
+    # pokračují vpravo v nepojmenovaných sloupcích. Podporujeme i variantu
+    # Ingredience 1, Ingredience 2, …
+    if ingredient_start is not None and len(ingredient_cols) <= 1:
+        known_after = [col for key, col in mapped.items() if key not in {"title", "external_id"} and col > ingredient_start]
+        ingredient_end = min(known_after) - 1 if known_after else max_col
+        ingredient_cols = list(range(ingredient_start, ingredient_end + 1))
+
+    with db() as conn:
+        existing_rows = conn.execute(
+            "SELECT id,external_id,title FROM recipes WHERE active=1"
+        ).fetchall()
+    by_external = {str(row["external_id"] or "").strip(): dict(row) for row in existing_rows if str(row["external_id"] or "").strip()}
+    by_title = {norm(row["title"]): dict(row) for row in existing_rows}
+
+    source_fields = set(mapped.keys())
+    if ingredient_cols:
+        source_fields.add("ingredients")
+
+    recipes = []
+    skipped = []
+    for row in range(header_row + 1, max_row + 1):
+        title = _clean(cells.get((row, mapped["title"])), 180)
+        external_id = _clean(cells.get((row, mapped["external_id"])), 80)
+        if not title and not external_id:
+            continue
+        if not title:
+            skipped.append({"row": row, "reason": "Chybí název."})
+            continue
+        if not external_id:
+            skipped.append({"row": row, "title": title, "reason": "Chybí ID."})
+            continue
+
+        payload = {
+            "external_id": external_id,
+            "title": title,
+            "recipe_type": _clean(cells.get((row, mapped.get("recipe_type"))), 120) if mapped.get("recipe_type") else "",
+            "lunchbox": _clean(cells.get((row, mapped.get("lunchbox"))), 80) if mapped.get("lunchbox") else "",
+            "prep_time": _clean(cells.get((row, mapped.get("prep_time"))), 80) if mapped.get("prep_time") else "",
+            "description": _clean(cells.get((row, mapped.get("description"))), 1000) if mapped.get("description") else "",
+            "instructions": str(cells.get((row, mapped.get("instructions")), "") or "").strip()[:12000] if mapped.get("instructions") else "",
+            "ingredients": [],
+            "source_fields": sorted(source_fields),
+            "source_row": row,
+        }
+        if mapped.get("servings"):
+            try:
+                payload["servings"] = max(1, min(int(float(str(cells.get((row, mapped["servings"]), 2) or 2).replace(",", "."))), 30))
+            except ValueError:
+                payload["servings"] = 2
+        else:
+            payload["servings"] = 2
+
+        for col in ingredient_cols:
+            raw = str(cells.get((row, col), "") or "").strip()
+            if not raw:
+                continue
+            payload["ingredients"].extend(_parse_import_ingredients(raw))
+
+        existing = by_external.get(external_id)
+        action = "new"
+        target_id = None
+        conflict = False
+        if existing:
+            action, target_id = "update", existing["id"]
+        else:
+            same_title = by_title.get(norm(title))
+            if same_title:
+                if not str(same_title.get("external_id") or "").strip():
+                    action, target_id = "update", same_title["id"]
+                elif str(same_title.get("external_id") or "").strip() != external_id:
+                    action, conflict = "conflict", True
+
+        recipes.append({
+            **payload,
+            "action": action,
+            "target_id": target_id,
+            "conflict": conflict,
+            "selected": not conflict,
+        })
+
+    if not recipes:
+        raise ValueError("V XLSX nebyl nalezen žádný použitelný recept.")
+    return {
+        "sheet": sheet_name,
+        "recipes": recipes,
+        "count": len(recipes),
+        "new_count": sum(1 for item in recipes if item["action"] == "new"),
+        "update_count": sum(1 for item in recipes if item["action"] == "update"),
+        "conflict_count": sum(1 for item in recipes if item["action"] == "conflict"),
+        "skipped": skipped,
+    }
+
+
+def commit_recipe_xlsx_import(payload):
+    items = payload.get("recipes") or []
+    created = []
+    updated = []
+    skipped = []
+    for index, item in enumerate(items[:500], start=1):
+        if not isinstance(item, dict) or not item.get("selected", True):
+            continue
+        external_id = _clean(item.get("external_id"), 80)
+        title = _clean(item.get("title"), 180)
+        if not external_id or not title:
+            skipped.append({"index": index, "reason": "Chybí ID nebo název."})
+            continue
+        source_fields = set(item.get("source_fields") or [])
+
+        with db() as conn:
+            existing = conn.execute(
+                "SELECT * FROM recipes WHERE active=1 AND external_id=? LIMIT 1",
+                (external_id,),
+            ).fetchone()
+            if not existing:
+                existing = conn.execute(
+                    "SELECT * FROM recipes WHERE active=1 AND LOWER(TRIM(title))=LOWER(TRIM(?)) LIMIT 1",
+                    (title,),
+                ).fetchone()
+        if existing and str(existing["external_id"] or "").strip() not in {"", external_id}:
+            skipped.append({"title": title, "reason": f"Název už používá jiné ID ({existing['external_id']})."})
+            continue
+
+        if existing:
+            current = recipe_dict(existing)
+            merged = {
+                "external_id": external_id,
+                "title": title,
+                "recipe_type": item.get("recipe_type", "") if "recipe_type" in source_fields else current.get("recipe_type", ""),
+                "lunchbox": item.get("lunchbox", "") if "lunchbox" in source_fields else current.get("lunchbox", ""),
+                "prep_time": item.get("prep_time", "") if "prep_time" in source_fields else current.get("prep_time", ""),
+                "description": item.get("description", "") if "description" in source_fields else current.get("description", ""),
+                "servings": item.get("servings", 2) if "servings" in source_fields else current.get("servings", 2),
+                "instructions": item.get("instructions", "") if "instructions" in source_fields else current.get("instructions", ""),
+                "ingredients": item.get("ingredients", []) if "ingredients" in source_fields else current.get("ingredients", []),
+                "image_url": current.get("image_url", ""),
+            }
+            saved = save_recipe(merged, existing["id"])
+            updated.append({"id": saved["id"], "external_id": external_id, "title": saved["title"]})
+        else:
+            saved = save_recipe({
+                "external_id": external_id,
+                "title": title,
+                "recipe_type": item.get("recipe_type", ""),
+                "lunchbox": item.get("lunchbox", ""),
+                "prep_time": item.get("prep_time", ""),
+                "description": item.get("description", ""),
+                "servings": item.get("servings", 2),
+                "instructions": item.get("instructions", ""),
+                "ingredients": item.get("ingredients", []),
+                "image_url": "",
+            })
+            created.append({"id": saved["id"], "external_id": external_id, "title": saved["title"]})
+
+    return {
+        "count": len(created) + len(updated),
+        "created": created,
+        "updated": updated,
+        "created_count": len(created),
+        "updated_count": len(updated),
+        "skipped": skipped,
+    }
 
 
 def _recipe_image_id_from_filename(filename):
