@@ -1108,8 +1108,14 @@ def _scan_work_image(image_path, source_name):
         requested_scale=5.0,
         psm=6,
     )
+    overview_afternoon_words = [
+        word for word in overview_words
+        if left <= float(word.get("left", 0)) + float(word.get("width", 0)) / 2 <= right
+        and top <= float(word.get("top", 0)) + float(word.get("height", 0)) / 2 <= bottom
+    ]
+    extract_words = afternoon_words + overview_afternoon_words
     shifts, diagnostics = _work_extract_afternoons(
-        afternoon_words, model, source_name, width, left, right
+        extract_words, model, source_name, width, left, right
     )
 
     if not shifts:
@@ -1224,16 +1230,32 @@ def scan_work(original_name, body):
                 diagnostics.extend(fallback_diag)
                 debug_text = text[:30000]
 
-        scan_id = _save_work_scan_log(
-            source_name,
-            meta.get("width"),
-            meta.get("height"),
-            meta.get("model"),
-            meta.get("left"),
-            meta.get("right"),
-            diagnostics,
-            debug_text,
-        )
+        try:
+            scan_id = _save_work_scan_log(
+                source_name,
+                meta.get("width"),
+                meta.get("height"),
+                meta.get("model"),
+                meta.get("left"),
+                meta.get("right"),
+                diagnostics,
+                debug_text,
+            )
+        except Exception as exc:
+            print(f"[haneva-v1] work OCR log failed: {type(exc).__name__}: {exc}", flush=True)
+            scan_id = None
+            diagnostics.append({
+                "token": "",
+                "similarity": None,
+                "ocr_confidence": None,
+                "x": None,
+                "x_percent": None,
+                "row_day": None,
+                "y_delta": None,
+                "decision": "logovani",
+                "accepted": False,
+                "reason": f"OCR proběhlo, ale nepodařilo se uložit diagnostický log: {type(exc).__name__}: {exc}",
+            })
         for shift in shifts:
             shift["scan_id"] = scan_id
         accepted_diagnostics = [row for row in diagnostics if row.get("accepted")]
