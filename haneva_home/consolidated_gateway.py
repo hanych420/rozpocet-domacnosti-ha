@@ -250,13 +250,18 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             "/wishlist": WISHLIST_HTML_PATH, "/wishlist/": WISHLIST_HTML_PATH,
             "/uctenky": RECEIPTS_HTML_PATH, "/uctenky/": RECEIPTS_HTML_PATH,
             "/prehledy": INSIGHTS_HTML_PATH, "/prehledy/": INSIGHTS_HTML_PATH,
-            "/kalendar/prace": WORK_HTML_PATH, "/kalendar/prace/": WORK_HTML_PATH,
         }
         if path in v1_pages:
             try:
                 self.send_bytes(app.read_page(v1_pages[path]))
             except OSError:
                 self.send_bytes(b"Page not found\n", 500, "text/plain; charset=utf-8")
+            return
+
+        if path in ("/kalendar/prace", "/kalendar/prace/"):
+            self.send_response(302)
+            self.send_header("Location", "/kalendar")
+            self.end_headers()
             return
 
         if path == "/api/v1/recipes":
@@ -300,7 +305,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             self.send_json(v1_features.finance_insights())
             return
 
-        if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/", "/kalendar/prace", "/kalendar/prace/"):
+        if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/"):
             try:
                 self.send_bytes(app.read_page(SMART_HOME_HTML_PATH))
             except OSError:
@@ -379,6 +384,22 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 payload = self.read_json()
                 payload["created_by"] = profile_gateway.session_payload(profile_gateway.access_email(self)).get("person", "")
                 self.send_json({"item": v1_features.save_wishlist(payload)}, 201)
+                return
+            if path == "/api/v1/work-xlsx/preview":
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > v1_features.MAX_UPLOAD:
+                    raise ValueError("Soubor chybí nebo je příliš velký.")
+                filename = unquote(self.headers.get("X-Filename", "smeny.xlsx"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Soubor nebyl nahrán celý.")
+                self.send_json(v1_features.parse_work_xlsx(filename, body))
+                return
+            if path == "/api/v1/work-xlsx/commit":
+                self.send_json(v1_features.sync_work_xlsx(self.read_json()), 201)
                 return
             if path in {"/api/v1/receipts/scan", "/api/v1/work/scan"}:
                 try:

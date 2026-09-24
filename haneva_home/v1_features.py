@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from http.client import HTTPConnection
 from pathlib import Path
+from io import BytesIO
 import calendar
 import difflib
 import json
@@ -10,9 +11,11 @@ import shutil
 import sqlite3
 import subprocess
 import tempfile
+import zipfile
 import unicodedata
 from collections import Counter
 from statistics import median
+import xml.etree.ElementTree as ET
 
 from PIL import Image, ImageEnhance, ImageFilter
 import uuid
@@ -25,6 +28,7 @@ MAX_UPLOAD = 18 * 1024 * 1024
 PERSONS = {"hanych", "eva"}
 RESET_DAY_DEFAULT = 6  # Sunday, Python weekday()
 SHIFT_VALUES = {"dopoledni", "odpoledni"}
+WORK_XLSX_NOTE = "Automaticky importováno ze směn XLSX."
 
 DATE_RE = re.compile(r"\b([0-3]?\d)[.\-/]([01]?\d)(?:[.\-/](20\d{2}|\d{2}))?\b")
 MONEY_RE = re.compile(r"(?<!\d)(\d{1,6}(?:[ .]\d{3})*(?:[,.]\d{1,2})?)\s*(?:Kc|Kč|CZK)?\b", re.I)
@@ -156,12 +160,10 @@ def init_db():
     if Path(calendar_path).exists():
         try:
             with sqlite3.connect(calendar_path, timeout=10) as calendar_conn:
+                # 1.0.8 opouští OCR/oddělený pracovní kalendář. Staré automatické
+                # záznamy odstraníme; nový XLSX import je následně synchronizuje.
                 calendar_conn.execute(
-                    "DELETE FROM events WHERE title='Práce – dopolední' AND notes='Automaticky importováno ze směn Jan Vaněk.'"
-                )
-                calendar_conn.execute(
-                    """UPDATE events SET start_time='14:00',end_time='22:00',all_day=0,updated_at=CURRENT_TIMESTAMP
-                       WHERE title='Práce – odpolední' AND notes='Automaticky importováno ze směn Jan Vaněk.'"""
+                    "DELETE FROM events WHERE notes='Automaticky importováno ze směn Jan Vaněk.'"
                 )
                 calendar_conn.commit()
         except sqlite3.Error:
@@ -1416,6 +1418,278 @@ def work_scan_logs(limit=10):
             item["region_right_percent"] = round((item.get("region_right") or 0) / item["image_width"] * 100, 1)
         result.append(item)
     return result
+
+
+
+def _xlsx_col_number(ref):
+    match = re.match(r"([A-Z]+)", str(ref or "").upper())
+    if not match:
+        return None
+    value = 0
+    for ch in match.group(1):
+        value = value * 26 + (ord(ch) - 64)
+    return value
+
+
+def _xlsx_shared_strings(archive):
+    path = "xl/sharedStrings.xml"
+    if path not in archive.namelist():
+        return []
+    root = ET.fromstring(archive.read(path))
+    ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    values = []
+    for item in root.findall("x:si", ns):
+        text = "".join(node.text or "" for node in item.findall(".//x:t", ns))
+        values.append(text)
+    return values
+
+
+def _xlsx_sheet_path(archive, wanted_name="Směny"):
+    ns_main = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main",
+               "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships"}
+    workbook = ET.fromstring(archive.read("xl/workbook.xml"))
+    sheets = workbook.find("x:sheets", ns_main)
+    if sheets is None:
+        raise ValueError("Sešit neobsahuje žádný list.")
+    selected = None
+    for sheet in sheets:
+        if sheet.attrib.get("name") == wanted_name:
+            selected = sheet
+            break
+    if selected is None:
+        selected = next(iter(sheets), None)
+    if selected is None:
+        raise ValueError("Sešit neobsahuje žádný list.")
+    rel_id = selected.attrib.get("{http://schemas.openxmlformats.org/officeDocument/2006/relationships}id")
+    rels = ET.fromstring(archive.read("xl/_rels/workbook.xml.rels"))
+    rel_ns = {"r": "http://schemas.openxmlformats.org/package/2006/relationships"}
+    target = None
+    for rel in rels.findall("r:Relationship", rel_ns):
+        if rel.attrib.get("Id") == rel_id:
+            target = rel.attrib.get("Target")
+            break
+    if not target:
+        raise ValueError("List se nepodařilo otevřít.")
+    target = target.lstrip("/")
+    if not target.startswith("xl/"):
+        target = "xl/" + target
+    return target, selected.attrib.get("name") or wanted_name
+
+
+def _xlsx_cell_value(cell, shared):
+    ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    cell_type = cell.attrib.get("t")
+    if cell_type == "inlineStr":
+        return "".join(node.text or "" for node in cell.findall(".//x:t", ns))
+    value_node = cell.find("x:v", ns)
+    if value_node is None:
+        return ""
+    raw = value_node.text or ""
+    if cell_type == "s":
+        try:
+            return shared[int(raw)]
+        except (ValueError, IndexError):
+            return ""
+    if cell_type == "b":
+        return raw == "1"
+    return raw
+
+
+def _xlsx_excel_date(value):
+    if value is None or value == "":
+        return None
+    text = str(value).strip()
+    # ISO/string date fallback.
+    for fmt in ("%Y-%m-%d", "%d.%m.%Y", "%d.%m.%y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(text[:10], fmt).date()
+        except ValueError:
+            pass
+    try:
+        serial = float(text)
+    except ValueError:
+        return None
+    if not 20000 <= serial <= 80000:
+        return None
+    return date(1899, 12, 30) + timedelta(days=int(serial))
+
+
+def parse_work_xlsx(original_name, body):
+    if not body or len(body) > MAX_UPLOAD:
+        raise ValueError("Soubor může mít nejvýše 18 MB.")
+    if not str(original_name or "").lower().endswith(".xlsx") or not body.startswith(b"PK"):
+        raise ValueError("Nahraj Excel soubor .xlsx.")
+    try:
+        archive = zipfile.ZipFile(BytesIO(body))
+    except zipfile.BadZipFile:
+        raise ValueError("Soubor není platný XLSX.")
+
+    with archive:
+        shared = _xlsx_shared_strings(archive)
+        sheet_path, sheet_name = _xlsx_sheet_path(archive, "Směny")
+        root = ET.fromstring(archive.read(sheet_path))
+        ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+
+        cells = {}
+        for cell in root.findall(".//x:sheetData/x:row/x:c", ns):
+            ref = cell.attrib.get("r", "")
+            match = re.match(r"([A-Z]+)(\d+)", ref)
+            if not match:
+                continue
+            col = _xlsx_col_number(match.group(1))
+            row = int(match.group(2))
+            cells[(row, col)] = _xlsx_cell_value(cell, shared)
+
+        date_header = None
+        afternoon_header = None
+        for (row, col), value in cells.items():
+            normalized = norm(value)
+            if normalized == "datum" and date_header is None:
+                date_header = (row, col)
+            if "odpoledni smena" in normalized and afternoon_header is None:
+                afternoon_header = (row, col)
+
+        if not date_header:
+            raise ValueError("V listu se nepodařilo najít sloupec Datum.")
+        if not afternoon_header:
+            raise ValueError("V listu se nepodařilo najít hlavičku Odpolední směna.")
+
+        afternoon_start = afternoon_header[1]
+        afternoon_end = None
+        merge_parent = root.find("x:mergeCells", ns)
+        if merge_parent is not None:
+            for merge in merge_parent.findall("x:mergeCell", ns):
+                ref = merge.attrib.get("ref", "")
+                parts = ref.split(":")
+                if len(parts) != 2:
+                    continue
+                start_match = re.match(r"([A-Z]+)(\d+)", parts[0])
+                end_match = re.match(r"([A-Z]+)(\d+)", parts[1])
+                if not start_match or not end_match:
+                    continue
+                sr, sc = int(start_match.group(2)), _xlsx_col_number(start_match.group(1))
+                er, ec = int(end_match.group(2)), _xlsx_col_number(end_match.group(1))
+                if sr <= afternoon_header[0] <= er and sc <= afternoon_start <= ec:
+                    afternoon_start, afternoon_end = sc, ec
+                    break
+
+        # Kdyby export z Google Sheets merge nezachoval, vezmeme čtyři sloupce
+        # od hlavičky; současný rozpis má 3 servisní techniky + Linka OM.
+        if afternoon_end is None:
+            afternoon_end = afternoon_start + 3
+
+        data_start = max(date_header[0], afternoon_header[0]) + 1
+        max_row = max((row for row, _ in cells), default=data_start)
+        found = []
+        evidence = []
+        for row in range(data_start, max_row + 1):
+            work_date = _xlsx_excel_date(cells.get((row, date_header[1])))
+            if not work_date:
+                continue
+            matches = []
+            for col in range(afternoon_start, afternoon_end + 1):
+                value = str(cells.get((row, col), "") or "").strip()
+                if norm(value) == "jan vanek":
+                    matches.append({"column": col, "value": value})
+            if matches:
+                iso = work_date.isoformat()
+                if iso not in found:
+                    found.append(iso)
+                evidence.append({"date": iso, "matches": matches})
+
+        found.sort()
+        if not found:
+            raise ValueError("V odpolední směně nebyl nalezen Jan Vaněk.")
+
+        months = sorted({value[:7] for value in found})
+        return {
+            "source_name": Path(original_name or "smeny.xlsx").name[:180],
+            "sheet": sheet_name,
+            "dates": found,
+            "count": len(found),
+            "months": months,
+            "evidence": evidence,
+        }
+
+
+def sync_work_xlsx(payload):
+    raw_dates = payload.get("dates") or []
+    source_name = _clean(payload.get("source_name") or "smeny.xlsx", 180)
+    parsed = []
+    for raw in raw_dates[:62]:
+        try:
+            parsed.append(date.fromisoformat(str(raw)))
+        except ValueError:
+            continue
+    parsed = sorted(set(parsed))
+    if not parsed:
+        raise ValueError("Import neobsahuje žádné platné směny.")
+
+    calendar_path = "/data/calendar.db"
+    if not Path(calendar_path).exists():
+        raise ValueError("Databáze kalendáře není dostupná.")
+
+    by_month = {}
+    for value in parsed:
+        by_month.setdefault((value.year, value.month), []).append(value)
+
+    added = removed = kept = 0
+    with sqlite3.connect(calendar_path, timeout=15) as conn:
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(events)").fetchall()}
+        if "event_type" not in columns:
+            conn.execute("ALTER TABLE events ADD COLUMN event_type TEXT NOT NULL DEFAULT ''")
+
+        # Pozůstatky OCR importu už nepoužíváme.
+        conn.execute("DELETE FROM events WHERE notes='Automaticky importováno ze směn Jan Vaněk.'")
+
+        for (year, month), month_dates in by_month.items():
+            start = date(year, month, 1)
+            end = date(year + (month == 12), 1 if month == 12 else month + 1, 1) - timedelta(days=1)
+            wanted = {value.isoformat() for value in month_dates}
+            existing = conn.execute(
+                """SELECT id,start_date FROM events
+                   WHERE calendar='hanych' AND event_type='prace' AND notes=?
+                     AND start_date BETWEEN ? AND ?""",
+                (WORK_XLSX_NOTE, start.isoformat(), end.isoformat()),
+            ).fetchall()
+            for event_id, start_date in existing:
+                if start_date not in wanted:
+                    conn.execute("DELETE FROM events WHERE id=?", (event_id,))
+                    removed += 1
+
+            for value in month_dates:
+                iso = value.isoformat()
+                row = conn.execute(
+                    """SELECT id FROM events
+                       WHERE calendar='hanych' AND event_type='prace'
+                         AND start_date=? AND end_date=? LIMIT 1""",
+                    (iso, iso),
+                ).fetchone()
+                if row:
+                    conn.execute(
+                        """UPDATE events SET title='Odpolední',all_day=1,start_time='',end_time='',
+                           location='',recurrence='none',notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                        (WORK_XLSX_NOTE, row[0]),
+                    )
+                    kept += 1
+                else:
+                    conn.execute(
+                        """INSERT INTO events
+                           (title,calendar,start_date,end_date,start_time,end_time,all_day,location,notes,recurrence,event_type)
+                           VALUES('Odpolední','hanych',?,?,'','',1,'',?,'none','prace')""",
+                        (iso, iso, WORK_XLSX_NOTE),
+                    )
+                    added += 1
+        conn.commit()
+
+    return {
+        "added": added,
+        "removed": removed,
+        "kept": kept,
+        "count": len(parsed),
+        "dates": [value.isoformat() for value in parsed],
+        "source_name": source_name,
+    }
 
 
 def _budget_dashboard():
