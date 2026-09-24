@@ -273,13 +273,14 @@
     const months=['leden','únor','březen','duben','květen','červen','červenec','srpen','září','říjen','listopad','prosinec'];
     const calendarNames={hanych:'Hanych',eva:'Eva',spolecne:'Společné',narozeniny:'Narozeniny',kumi:'🐕 Hlídání Kumi',svatky:'🇨🇿 Státní svátky'};
     const allCalendars=['hanych','eva','spolecne','narozeniny','kumi'];
+    const allFilterKeys=[...allCalendars,'prace'];
     const colorKeys=[...allCalendars,'svatky'];
     const defaultColors={hanych:'#60a5fa',eva:'#c084fc',spolecne:'#34d399',narozeniny:'#fb923c',kumi:'#6b7280',svatky:'#ef4444'};
     const initialView=new URLSearchParams(location.search).get('view');
     const state={
       cursor:new Date(new Date().getFullYear(),new Date().getMonth(),1),
       events:[],
-      filters:new Set(allCalendars),
+      filters:new Set(allFilterKeys),
       filterMode:'all',
       view:initialView==='agenda'?'agenda':'month',
       editingId:null,
@@ -291,7 +292,8 @@
       tickets:[],
       ticketFile:null,
       removeTicketBundle:false,
-      saving:false
+      saving:false,
+      workImport:null
     };
     const mouseGesture={kind:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
     const touchGesture={kind:null,timer:null,startX:0,startY:0,startDate:null,currentDate:null,event:null,eventEl:null,active:false};
@@ -303,7 +305,8 @@
     const sameDay=(a,b)=>a.getFullYear()===b.getFullYear()&&a.getMonth()===b.getMonth()&&a.getDate()===b.getDate();
     const escapeHtml=(s='')=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[c]));
     const isHoliday=e=>e.system_kind==='holiday';
-    const visibleEvents=()=>state.events.filter(e=>isHoliday(e)||state.filters.has(e.calendar));
+    const isWork=e=>e.event_type==='prace';
+    const visibleEvents=()=>state.events.filter(e=>{if(isHoliday(e))return true;if(isWork(e))return state.filters.has('prace');return state.filters.has(e.calendar)});
     const daysBetween=(a,b)=>Math.round((parseIso(b)-parseIso(a))/86400000);
     const addDays=(s,n)=>{const d=parseIso(s);d.setDate(d.getDate()+n);return isoLocal(d)};
 
@@ -414,15 +417,17 @@
         cell.appendChild(number);
 
         const dayEvents=eventsForDay(d);
+        const workEvents=dayEvents.filter(isWork);
+        const regularEvents=dayEvents.filter(e=>!isWork(e));
         const expanded=state.expandedDays.has(dateKey);
-        const shownEvents=expanded?dayEvents:dayEvents.slice(0,3);
+        const shownEvents=expanded?dayEvents:[...workEvents,...regularEvents.slice(0,3)];
         shownEvents.forEach(event=>{
-          const holiday=isHoliday(event);
+          const holiday=isHoliday(event),work=isWork(event);
           const btn=document.createElement('button');
           btn.type='button';
-          btn.className=`event ${holiday?'svatky':event.calendar}`;
+          btn.className=`event ${holiday?'svatky':event.calendar}${work?' work':''}`;
           btn.textContent=eventLabel(event);
-          btn.title=`${holiday?'Státní svátek':calendarNames[event.calendar]} · ${event.title}`;
+          btn.title=work?`Hanych · Práce · ${event.title}`:`${holiday?'Státní svátek':calendarNames[event.calendar]} · ${event.title}`;
           if(holiday){
             btn.setAttribute('aria-label',`Státní svátek: ${event.title}`);
           }else{
@@ -430,11 +435,11 @@
           }
           cell.appendChild(btn);
         });
-        if(dayEvents.length>3){
+        if(regularEvents.length>3){
           const more=document.createElement('button');
           more.type='button';
           more.className='more';
-          more.textContent=expanded?'− Skrýt':`+ ${dayEvents.length-3} další`;
+          more.textContent=expanded?'− Skrýt':`+ ${regularEvents.length-3} další`;
           more.setAttribute('aria-expanded',expanded?'true':'false');
           more.addEventListener('click',ev=>{
             ev.stopPropagation();
@@ -467,8 +472,9 @@
       events.forEach(e=>{
         const btn=document.createElement('button');
         btn.type='button';
-        btn.className='agenda-event';
-        const time=e.all_day?'Celý den':[e.start_time,e.end_time].filter(Boolean).join('–');
+        const work=isWork(e);
+        btn.className='agenda-event'+(work?' work':'');
+        const time=work?'Hanych · Práce':(e.all_day?'Celý den':[e.start_time,e.end_time].filter(Boolean).join('–'));
         const loc=e.location?` · ${e.location}`:'';
         const repeat=e.recurrence==='yearly'?' · každý rok':'';
         const ticket=e.has_ticket?' · 🎟️ vstupenka':'';
@@ -888,15 +894,15 @@
         state.filterMode='custom';
       }else if(state.filters.has(key)){
         if(state.filters.size===1){
-          state.filters=new Set(allCalendars);
+          state.filters=new Set(allFilterKeys);
           state.filterMode='all';
         }else{
           state.filters.delete(key);
         }
       }else{
         state.filters.add(key);
-        if(state.filters.size===allCalendars.length){
-          state.filters=new Set(allCalendars);
+        if(state.filters.size===allFilterKeys.length){
+          state.filters=new Set(allFilterKeys);
           state.filterMode='all';
         }
       }
