@@ -711,6 +711,61 @@
       const lock=ticketWakeLock;ticketWakeLock=null;if(lock)lock.release().catch(()=>{});
     }
 
+    function formatWorkDate(value){
+      const d=parseIso(value);
+      return new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'numeric',year:'numeric'}).format(d);
+    }
+
+    function closeWorkImport(){
+      $('workImportDialog').close();
+      $('workFile').value='';
+    }
+
+    async function previewWorkFile(file){
+      if(!file)return;
+      state.workImport=null;
+      $('confirmWorkImport').disabled=true;
+      $('workImportDates').innerHTML='';
+      $('workImportSummary').textContent='Čtu soubor…';
+      $('workImportStatus').textContent=file.name;
+      $('workImportDialog').showModal();
+      try{
+        const res=await fetch('/api/v1/work-xlsx/preview',{method:'POST',headers:{'Content-Type':file.type||'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','X-Filename':encodeURIComponent(file.name)},body:file});
+        const data=await res.json();
+        if(!res.ok)throw new Error(data.error||'Soubor se nepodařilo načíst.');
+        state.workImport=data;
+        $('workImportSummary').textContent='Nalezeno '+data.count+' odpoledních směn pro Jana Vaňka.';
+        $('workImportStatus').textContent='List: '+data.sheet+' · '+data.source_name;
+        const box=$('workImportDates');box.innerHTML='';
+        data.dates.forEach(value=>{const chip=document.createElement('span');chip.className='work-import-date';chip.textContent=formatWorkDate(value);box.appendChild(chip)});
+        $('confirmWorkImport').disabled=false;
+      }catch(err){
+        $('workImportSummary').textContent='Import se nepodařilo připravit.';
+        $('workImportStatus').textContent=err.message||String(err);
+      }
+    }
+
+    async function commitWorkImport(){
+      if(!state.workImport||!state.workImport.dates||!state.workImport.dates.length)return;
+      const button=$('confirmWorkImport');
+      button.disabled=true;button.textContent='Importuji…';
+      try{
+        const res=await fetch('/api/v1/work-xlsx/commit',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({dates:state.workImport.dates,source_name:state.workImport.source_name})});
+        const data=await res.json();
+        if(!res.ok)throw new Error(data.error||'Směny se nepodařilo importovat.');
+        const first=state.workImport.dates[0];
+        if(first){const d=parseIso(first);state.cursor=new Date(d.getFullYear(),d.getMonth(),1)}
+        $('workImportDialog').close();
+        toast('Práce synchronizována: '+data.count+' odpoledních směn.');
+        state.workImport=null;$('workFile').value='';
+        await loadEvents();
+      }catch(err){
+        $('workImportStatus').textContent=err.message||String(err);
+      }finally{
+        button.disabled=!state.workImport;
+        button.textContent='Importovat do kalendáře';
+      }
+    }
     function resetForm(){
       $('eventForm').reset();
       $('calendar').value='spolecne';
@@ -880,6 +935,12 @@
       toastTimer=setTimeout(()=>el.classList.remove('show'),2600);
     }
 
+    $('importWork').addEventListener('click',()=>$('workFile').click());
+    $('workFile').addEventListener('change',()=>previewWorkFile($('workFile').files[0]||null));
+    $('confirmWorkImport').addEventListener('click',commitWorkImport);
+    $('closeWorkImport').addEventListener('click',closeWorkImport);
+    $('cancelWorkImport').addEventListener('click',closeWorkImport);
+    $('workImportDialog').addEventListener('click',e=>{if(e.target===$('workImportDialog'))closeWorkImport()});
     $('newEvent').addEventListener('click',()=>openNew());
     $('prevMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()-1);state.expandedDays.clear();loadEvents()});
     $('nextMonth').addEventListener('click',()=>{state.cursor.setMonth(state.cursor.getMonth()+1);state.expandedDays.clear();loadEvents()});
