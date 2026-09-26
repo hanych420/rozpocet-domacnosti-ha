@@ -1,4 +1,7 @@
 configuration:
+  mama_admin_email:
+    name: "Hlavní administrátor"
+    description: "E-mail účtu přihlášeného přes Cloudflare Access, který bude spravovat uživatele. Cviky si máma může upravovat sama."
   parse_api_key:
     name: "Parse.bot API klíč pro Albert"
     description: "Volitelné. Použije se pro spravované Albert API; bez klíče se Albert akce nenačítají a Haneva nepoužije Kupi ani vlastní PDF parser."
