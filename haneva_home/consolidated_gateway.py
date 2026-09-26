@@ -374,6 +374,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 "can_manage": _can_manage_mama(self),
             })
             return
+        if path.startswith("/api/mama/media/"):
+            filename = unquote(path.rsplit("/", 1)[-1])
+            try:
+                body, mime = mama_data.read_media(filename)
+                self.send_bytes(body, 200, mime)
+            except FileNotFoundError:
+                self.send_json({"error": "Nápověda ke cviku nebyla nalezena."}, 404)
+            return
 
         if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/"):
             try:
@@ -436,6 +444,22 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         path = urlparse(self.path).path
 
         try:
+            if path == "/api/mama/media":
+                if not _can_manage_mama(self):
+                    self.send_json({"error": "Pro nahrání nápovědy se nejdřív přihlas přes Cloudflare."}, 403)
+                    return
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > mama_data.MEDIA_MAX_BYTES:
+                    raise ValueError("Fotka nebo GIF chybí nebo je větší než 12 MB.")
+                filename = unquote(self.headers.get("X-Filename", "napoveda"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Soubor nebyl nahrán celý.")
+                self.send_json(mama_data.save_media(filename, body), 201)
+                return
             match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)/image", path)
             if match:
                 try:

@@ -2,10 +2,14 @@ import json
 import os
 import re
 import sqlite3
+import uuid
+from pathlib import Path
 from urllib.parse import urlparse
 
 
 DB_PATH = "/data/haneva_mama.db"
+MEDIA_DIR = "/data/haneva_mama_media"
+MEDIA_MAX_BYTES = 12 * 1024 * 1024
 MAX_WORKOUTS = 12
 MAX_EXERCISES = 30
 
@@ -33,6 +37,7 @@ DEFAULT_WORKOUTS = [
 
 def init_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    os.makedirs(MEDIA_DIR, exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
             """CREATE TABLE IF NOT EXISTS mama_settings (
@@ -74,10 +79,52 @@ def _image_url(value):
         return ""
     if len(result) > 500:
         raise ValueError("Adresa obrázku je příliš dlouhá.")
+    if re.fullmatch(r"/api/mama/media/[a-f0-9]{32}\.(?:gif|jpe?g|png|webp)", result):
+        return result
     parsed = urlparse(result)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         raise ValueError("Obrázek musí mít platnou adresu začínající http:// nebo https://.")
     return result
+
+
+def _media_type(body):
+    if body.startswith((b"GIF87a", b"GIF89a")):
+        return "image/gif", ".gif"
+    if body.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png", ".png"
+    if body.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg", ".jpg"
+    if len(body) >= 12 and body[:4] == b"RIFF" and body[8:12] == b"WEBP":
+        return "image/webp", ".webp"
+    raise ValueError("Vyber fotku JPG, PNG, WebP nebo animovaný GIF.")
+
+
+def save_media(original_name, body):
+    if not body or len(body) > MEDIA_MAX_BYTES:
+        raise ValueError("Fotka nebo GIF může mít nejvýše 12 MB.")
+    mime, suffix = _media_type(body)
+    filename = uuid.uuid4().hex + suffix
+    Path(MEDIA_DIR).mkdir(parents=True, exist_ok=True)
+    (Path(MEDIA_DIR) / filename).write_bytes(body)
+    return {
+        "url": f"/api/mama/media/{filename}",
+        "name": Path(original_name or ("napoveda" + suffix)).name[:180],
+        "mime": mime,
+    }
+
+
+def read_media(filename):
+    if not re.fullmatch(r"[a-f0-9]{32}\.(?:gif|jpg|png|webp)", str(filename or "")):
+        raise FileNotFoundError
+    path = Path(MEDIA_DIR) / filename
+    try:
+        body = path.read_bytes()
+    except OSError:
+        raise FileNotFoundError
+    mime, suffix = _media_type(body)
+    if not filename.endswith(suffix):
+        raise FileNotFoundError
+    return body, mime
 
 
 def validate_music_url(value):
