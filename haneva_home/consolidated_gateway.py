@@ -1,4 +1,6 @@
+import json
 import os
+import secrets
 from datetime import date, timedelta
 from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse, unquote
@@ -11,6 +13,7 @@ import shopping
 import shopping_official
 import home_control
 import v1_features
+import mama_data
 
 VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
@@ -21,6 +24,31 @@ RECEIPTS_HTML_PATH = "/app/receipts.html"
 INSIGHTS_HTML_PATH = "/app/insights.html"
 WORK_HTML_PATH = "/app/work.html"
 MAMA_HTML_PATH = "/app/mama.html"
+
+
+def _addon_options():
+    try:
+        with open("/data/options.json", "r", encoding="utf-8") as handle:
+            value = json.load(handle)
+            return value if isinstance(value, dict) else {}
+    except (OSError, ValueError, TypeError):
+        return {}
+
+
+def _mama_admin_email():
+    return str(_addon_options().get("mama_admin_email") or "").strip().lower()
+
+
+def _mama_request_email(handler):
+    # Pro administrátorský zápis nepoužíváme obecný X-User-Email fallback.
+    # Identita musí přijít přímo z Cloudflare Access.
+    return str(handler.headers.get("Cf-Access-Authenticated-User-Email") or "").strip().lower()
+
+
+def _can_manage_mama(handler):
+    expected = _mama_admin_email()
+    actual = _mama_request_email(handler)
+    return bool(expected and actual and secrets.compare_digest(expected, actual))
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
 # po úspěšné migraci se přepne na embedded server ve stejném kontejneru.
@@ -339,6 +367,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         if path == "/api/v1/insights":
             self.send_json(v1_features.finance_insights())
             return
+        if path == "/api/mama/workouts":
+            admin_email = _mama_admin_email()
+            self.send_json({
+                "workouts": mama_data.get_workouts(),
+                "can_manage": _can_manage_mama(self),
+                "admin_configured": bool(admin_email),
+            })
+            return
 
         if path in ("/domov", "/domov/", "/jidlo", "/jidlo/", "/wishlist", "/wishlist/", "/uctenky", "/uctenky/", "/prehledy", "/prehledy/"):
             try:
@@ -597,6 +633,16 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
     def do_PUT(self):
         path = urlparse(self.path).path
+        if path == "/api/mama/workouts":
+            if not _can_manage_mama(self):
+                self.send_json({"error": "Tuto změnu může provést jen administrátor cvičení."}, 403)
+                return
+            try:
+                payload = self.read_json()
+                self.send_json({"workouts": mama_data.save_workouts(payload.get("workouts"))})
+            except (ValueError, TypeError, KeyError) as exc:
+                self.send_json({"error": str(exc)}, 400)
+            return
         try:
             match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)", path)
             if match:
@@ -657,6 +703,7 @@ if __name__ == "__main__":
     app.init_db()
     home_control.init_db()
     v1_features.init_db()
+    mama_data.init_db()
     shopping_official.init_db()
     shopping_official.start_worker()
     server = ThreadingHTTPServer((gateway.HOST, gateway.PORT), ConsolidatedGatewayHandler)
