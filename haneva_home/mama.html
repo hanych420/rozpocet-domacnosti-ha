@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#754668">
+  <title>Cvičení pro mámu · Haneva</title>
+  <style>
+    :root{color-scheme:light;--bg:#f7f0f3;--surface:#fffdfb;--text:#302833;--muted:#766d77;--primary:#754668;--primary-dark:#5e3652;--primary-soft:#eadbe4;--accent:#d78061;--success:#3f765f;--line:#e9dfe4;--shadow:0 12px 30px rgba(74,48,65,.10);font-family:Inter,ui-rounded,"SF Pro Rounded",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    *{box-sizing:border-box}html{background:var(--bg);-webkit-text-size-adjust:100%}body{margin:0;min-width:320px;min-height:100vh;color:var(--text);background:radial-gradient(circle at top right,rgba(215,128,97,.13),transparent 34rem),var(--bg)}button{font:inherit}button:focus-visible,a:focus-visible{outline:4px solid rgba(117,70,104,.24);outline-offset:3px}
+    .shell{width:min(100%,760px);min-height:100vh;margin:auto;padding:env(safe-area-inset-top) 18px calc(104px + env(safe-area-inset-bottom))}.topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 2px 18px}.brand{display:flex;align-items:center;gap:10px;color:var(--text);font-weight:900}.brand-mark{display:grid;width:42px;height:42px;place-items:center;border-radius:14px;color:#fff;background:var(--primary)}.heart{display:grid;width:48px;height:48px;place-items:center;border-radius:16px;color:#fff;background:var(--primary);font-size:1.25rem;box-shadow:var(--shadow)}
+    .eyebrow{margin:0 0 5px;color:var(--primary);font-size:.78rem;font-weight:850;letter-spacing:.09em;text-transform:uppercase}.heading{margin:8px 2px 18px}.heading h1{margin:0;font-size:clamp(2rem,9vw,2.6rem);line-height:1.04;letter-spacing:-.04em}.rotation,.timer-card,.music-card,.empty{border:1px solid rgba(117,70,104,.10);border-radius:24px;background:var(--surface);box-shadow:var(--shadow)}
+    .rotation{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:center;padding:16px;margin-bottom:18px}.rotation small{display:block;color:var(--muted);font-weight:750}.rotation strong{display:block;margin-top:4px;line-height:1.25}.rotation .today{color:var(--primary)}.arrow{color:var(--accent);font-size:1.4rem;font-weight:900}.notice{padding:14px 16px;margin-bottom:16px;border-radius:16px;color:var(--primary-dark);background:var(--primary-soft);font-weight:750;line-height:1.4}
+    .exercise-list{display:grid;gap:18px}.exercise{overflow:hidden;border:1px solid var(--line);border-radius:24px;background:var(--surface);box-shadow:var(--shadow)}.exercise.complete{border-color:rgba(63,118,95,.45)}.exercise-top{display:grid;grid-template-columns:92px 1fr;gap:15px;align-items:center;padding:15px}.art{display:grid;width:92px;height:92px;place-items:center;border-radius:20px;background:linear-gradient(145deg,var(--primary-soft),#f5e8df);font-size:2.8rem}.exercise h2{margin:0 0 9px;font-size:1.25rem}.meta{display:flex;flex-wrap:wrap;gap:7px}.pill{padding:5px 8px;border-radius:9px;color:var(--muted);background:#f5f0f2;font-size:.82rem;font-weight:800}.sets{padding:0 15px 15px}.sets p{margin:0 0 9px;color:var(--muted);font-size:.86rem;font-weight:750}.set-grid{display:grid;gap:9px}.set{min-height:58px;border:2px solid var(--line);border-radius:15px;color:var(--text);background:var(--surface);font-weight:900;cursor:pointer}.set.done{border-color:var(--success);color:#fff;background:var(--success)}.set.done::before{content:"✓ "}
+    .primary,.secondary{min-height:56px;border-radius:16px;padding:12px 18px;font-weight:900;cursor:pointer}.primary{border:0;color:#fff;background:var(--primary)}.primary:hover{background:var(--primary-dark)}.primary:disabled{opacity:.42;cursor:not-allowed}.secondary{border:2px solid var(--line);color:var(--primary);background:var(--surface)}.finish{width:100%;margin-top:20px}.finish-hint{margin:9px 0 0;color:var(--muted);text-align:center;font-size:.88rem}
+    .timer-card{padding:24px 18px;text-align:center}.timer-display{font-size:clamp(4.2rem,21vw,7rem);font-weight:950;letter-spacing:-.07em;line-height:1;font-variant-numeric:tabular-nums}.quick-times{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin:24px 0 18px}.chip{min-height:52px;border:2px solid var(--line);border-radius:15px;color:var(--primary);background:var(--surface);font-weight:900;cursor:pointer}.chip.selected{border-color:var(--primary);color:#fff;background:var(--primary)}.timer-actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.help{margin:18px 4px 0;color:var(--muted);font-size:.88rem;line-height:1.45}
+    .music-card{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;padding:18px;margin-top:18px}.music-icon{display:grid;width:52px;height:52px;place-items:center;border-radius:16px;color:#fff;background:var(--accent);font-size:1.7rem}.music-card h2{margin:0}.music-card p{margin:7px 0 0;color:var(--muted);line-height:1.45}.music-card .secondary{grid-column:1/-1;width:100%;opacity:.58;cursor:default}
+    .history{display:grid;gap:12px}.history-item{display:grid;grid-template-columns:auto 1fr auto;gap:13px;align-items:center;padding:16px;border:1px solid var(--line);border-radius:19px;background:var(--surface)}.check{display:grid;width:42px;height:42px;place-items:center;border-radius:50%;color:#fff;background:var(--success);font-weight:900}.history-copy strong,.history-copy span{display:block}.history-copy span{margin-top:3px;color:var(--muted);font-size:.87rem}.badge{color:var(--primary);font-size:.82rem;font-weight:900}.empty{padding:34px 24px;text-align:center}.empty strong{display:block;font-size:1.15rem}.empty p{margin:8px 0 0;color:var(--muted);line-height:1.45}
+    .nav{position:fixed;z-index:10;right:0;bottom:0;left:0;display:grid;grid-template-columns:repeat(3,1fr);width:min(100%,760px);margin:auto;padding:9px 14px calc(9px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:rgba(255,253,251,.94);box-shadow:0 -8px 30px rgba(74,48,65,.08);backdrop-filter:blur(14px)}.nav button{display:grid;gap:3px;min-height:62px;place-items:center;border:0;border-radius:16px;color:var(--muted);background:transparent;font-size:.78rem;font-weight:850;cursor:pointer}.nav button span:first-child{font-size:1.25rem}.nav button.active{color:var(--primary);background:var(--primary-soft)}
+    .toast{position:fixed;z-index:20;right:18px;bottom:calc(96px + env(safe-area-inset-bottom));left:18px;width:min(calc(100% - 36px),520px);margin:auto;padding:15px 18px;border-radius:16px;color:#fff;background:var(--text);box-shadow:var(--shadow);text-align:center;font-weight:800}
+    @media(min-width:680px){.shell{padding-right:28px;padding-left:28px}.exercise-list{grid-template-columns:1fr 1fr}.exercise-top{grid-template-columns:82px 1fr}.art{width:82px;height:82px}}
+    @media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important}}
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar"><div class="brand"><span class="brand-mark">M</span><span>Moje cvičení</span></div><span class="heart" aria-hidden="true">♥</span></header>
+    <main>
+      <section class="view" id="todayView">
+        <div class="heading"><p class="eyebrow" id="todayDate"></p><h1>Dnešní cvičení</h1></div>
+        <div class="rotation" id="rotation"></div>
+        <div class="notice" id="resume" hidden>Rozepsané cvičení zůstalo uložené. Můžeš pokračovat tam, kde jsi skončila.</div>
+        <div class="exercise-list" id="exerciseList"></div>
+        <button class="primary finish" id="finish" type="button">Dokončit dnešní cvičení</button>
+        <p class="finish-hint" id="finishHint">Nejdřív dokonči všechny série.</p>
+      </section>
+      <section class="view" id="timerView" hidden>
+        <div class="heading"><p class="eyebrow">Pauza mezi sériemi</p><h1>Minutka</h1></div>
+        <div class="timer-card"><div class="timer-display" id="timerDisplay" role="timer" aria-live="polite">01:00</div><div class="quick-times" aria-label="Rychlá volba času"><button class="chip" data-seconds="30" type="button">30 s</button><button class="chip selected" data-seconds="60" type="button">60 s</button><button class="chip" data-seconds="90" type="button">90 s</button></div><div class="timer-actions"><button class="primary" id="timerToggle" type="button">Spustit</button><button class="secondary" id="timerReset" type="button">Vynulovat</button></div><p class="help">Po skončení zazní krátké upozornění. Zvuk funguje po prvním klepnutí na stránku.</p></div>
+        <section class="music-card"><div class="music-icon" aria-hidden="true">♫</div><div><p class="eyebrow">Připraveno na později</p><h2>Hudba</h2><p>Zde bude možné vložit Spotify nebo YouTube playlist bez změny cvičební části.</p></div><button class="secondary" type="button" disabled>Brzy doplníme</button></section>
+      </section>
+      <section class="view" id="historyView" hidden><div class="heading"><p class="eyebrow">Hotové tréninky</p><h1>Historie</h1></div><div class="history" id="historyList"></div></section>
+    </main>
+    <nav class="nav" aria-label="Hlavní navigace"><button class="active" data-view="todayView" type="button" aria-current="page"><span aria-hidden="true">●</span><span>Dnes</span></button><button data-view="timerView" type="button"><span aria-hidden="true">◷</span><span>Minutka</span></button><button data-view="historyView" type="button"><span aria-hidden="true">✓</span><span>Historie</span></button></nav>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <script>
+    'use strict';
+    // Dočasná data jsou schválně na jednom místě, aby šla později snadno nahradit.
+    const WORKOUTS=[
+      {id:'A',name:'Nohy + ruce',exercises:[
+        {id:'chair-squat',name:'Dřep k židli',sets:3,reps:10,weight:'bez zátěže',art:'🪑'},
+        {id:'biceps',name:'Bicepsový zdvih',sets:3,reps:12,weight:'2 kg',art:'💪'},
+        {id:'calf-raise',name:'Výpony na špičky',sets:3,reps:12,weight:'bez zátěže',art:'🦵'}]},
+      {id:'B',name:'Nohy + břicho',exercises:[
+        {id:'step-back',name:'Zakročení s oporou',sets:3,reps:8,weight:'bez zátěže',art:'🚶'},
+        {id:'knee-lift',name:'Zvedání kolen ve stoje',sets:3,reps:10,weight:'bez zátěže',art:'🧍'},
+        {id:'wall-push',name:'Kliky o zeď',sets:3,reps:10,weight:'bez zátěže',art:'🙌'}]}
+    ];
+    const STORAGE_KEY='haneva-mama-v1';
+    const $=selector=>document.querySelector(selector);
+    const els={date:$('#todayDate'),rotation:$('#rotation'),list:$('#exerciseList'),finish:$('#finish'),finishHint:$('#finishHint'),resume:$('#resume'),history:$('#historyList'),timerDisplay:$('#timerDisplay'),timerToggle:$('#timerToggle'),timerReset:$('#timerReset'),toast:$('#toast')};
+    let state=loadState(),timer={selected:60,remaining:60,running:false,interval:null,deadline:null},audioContext,toastTimeout;
+    function loadState(){try{const saved=JSON.parse(localStorage.getItem(STORAGE_KEY));return saved&&typeof saved==='object'?{history:Array.isArray(saved.history)?saved.history:[],activeWorkoutId:WORKOUTS.some(w=>w.id===saved.activeWorkoutId)?saved.activeWorkoutId:'A',completedSets:saved.completedSets&&typeof saved.completedSets==='object'?saved.completedSets:{}}:{history:[],activeWorkoutId:'A',completedSets:{}}}catch(_){return{history:[],activeWorkoutId:'A',completedSets:{}}}}
+    function saveState(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state))}catch(_){showToast('Uložení se nepodařilo. Zkontroluj nastavení prohlížeče.')}}
+    function activeWorkout(){return WORKOUTS.find(w=>w.id===state.activeWorkoutId)||WORKOUTS[0]}
+    function previousWorkout(){return state.history.length?WORKOUTS.find(w=>w.id===state.history[0].workoutId):null}
+    function setKey(exerciseId,index){return state.activeWorkoutId+':'+exerciseId+':'+index}
+    function exerciseDone(exercise){return Array.from({length:exercise.sets},(_,i)=>Boolean(state.completedSets[setKey(exercise.id,i)])).every(Boolean)}
+    function workoutDone(){return activeWorkout().exercises.every(exerciseDone)}
+    function hasProgress(){return Object.keys(state.completedSets).some(key=>key.startsWith(state.activeWorkoutId+':')&&state.completedSets[key])}
+    function renderToday(){
+      const active=activeWorkout(),previous=previousWorkout();
+      els.date.textContent=new Intl.DateTimeFormat('cs-CZ',{weekday:'long',day:'numeric',month:'long'}).format(new Date());
+      els.rotation.innerHTML='<div><small>Minule</small><strong>'+(previous?previous.name:'Ještě nic')+'</strong></div><span class="arrow" aria-hidden="true">→</span><div class="today"><small>Dnes · Trénink '+active.id+'</small><strong>'+active.name+'</strong></div>';
+      els.list.replaceChildren(...active.exercises.map(exerciseCard));
+      const complete=workoutDone();els.finish.disabled=!complete;els.finishHint.textContent=complete?'Skvělé! Trénink je připravený k uložení.':'Nejdřív dokonči všechny série.';els.resume.hidden=!hasProgress()||complete;
+    }
+    function exerciseCard(exercise){
+      const completed=Array.from({length:exercise.sets},(_,i)=>Boolean(state.completedSets[setKey(exercise.id,i)])).filter(Boolean).length;
+      const article=document.createElement('article');article.className='exercise'+(completed===exercise.sets?' complete':'');
+      article.innerHTML='<div class="exercise-top"><div class="art" role="img" aria-label="Dočasná ilustrace cviku">'+exercise.art+'</div><div><h2>'+exercise.name+'</h2><div class="meta"><span class="pill">'+exercise.sets+' série</span><span class="pill">'+exercise.reps+' opakování</span><span class="pill">'+exercise.weight+'</span></div></div></div><div class="sets"><p>Hotovo '+completed+' z '+exercise.sets+' sérií</p><div class="set-grid"></div></div>';
+      const grid=article.querySelector('.set-grid');grid.style.gridTemplateColumns='repeat('+Math.min(exercise.sets,4)+',1fr)';
+      for(let i=0;i<exercise.sets;i++){const button=document.createElement('button'),done=Boolean(state.completedSets[setKey(exercise.id,i)]);button.type='button';button.className='set'+(done?' done':'');button.textContent='Série '+(i+1);button.setAttribute('aria-pressed',String(done));button.addEventListener('click',()=>{const key=setKey(exercise.id,i);state.completedSets[key]=!state.completedSets[key];saveState();renderToday()});grid.append(button)}
+      return article;
+    }
+    function finishWorkout(){if(!workoutDone())return;const active=activeWorkout(),id=typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now()+'-'+active.id;state.history.unshift({id,workoutId:active.id,name:active.name,completedAt:new Date().toISOString()});state.history=state.history.slice(0,100);const index=WORKOUTS.findIndex(w=>w.id===active.id);state.activeWorkoutId=WORKOUTS[(index+1)%WORKOUTS.length].id;state.completedSets={};saveState();renderToday();renderHistory();showToast('Hotovo! Příště tě čeká '+activeWorkout().name+'.');window.scrollTo({top:0,behavior:'smooth'})}
+    function renderHistory(){if(!state.history.length){els.history.innerHTML='<div class="empty"><strong>Zatím tu nic není</strong><p>První dokončené cvičení se sem automaticky uloží.</p></div>';return}els.history.replaceChildren(...state.history.map(entry=>{const item=document.createElement('article'),when=new Date(entry.completedAt),date=new Intl.DateTimeFormat('cs-CZ',{day:'numeric',month:'long',year:'numeric'}).format(when),time=new Intl.DateTimeFormat('cs-CZ',{hour:'2-digit',minute:'2-digit'}).format(when);item.className='history-item';item.innerHTML='<span class="check" aria-hidden="true">✓</span><div class="history-copy"><strong>'+entry.name+'</strong><span>'+date+' v '+time+'</span></div><span class="badge">Trénink '+entry.workoutId+'</span>';return item}))}
+    function showView(id){document.querySelectorAll('.view').forEach(view=>view.hidden=view.id!==id);document.querySelectorAll('.nav button').forEach(button=>{const active=button.dataset.view===id;button.classList.toggle('active',active);active?button.setAttribute('aria-current','page'):button.removeAttribute('aria-current')});window.scrollTo({top:0,behavior:'smooth'})}
+    function formatTime(seconds){return String(Math.floor(seconds/60)).padStart(2,'0')+':'+String(seconds%60).padStart(2,'0')}
+    function renderTimer(){els.timerDisplay.textContent=formatTime(timer.remaining);els.timerToggle.textContent=timer.running?'Pozastavit':timer.remaining===0?'Znovu spustit':'Spustit';document.querySelectorAll('.chip').forEach(chip=>chip.classList.toggle('selected',Number(chip.dataset.seconds)===timer.selected))}
+    function stopInterval(){if(timer.interval!==null)clearInterval(timer.interval);timer.interval=null}
+    function selectTime(seconds){stopInterval();timer.selected=seconds;timer.remaining=seconds;timer.running=false;renderTimer()}
+    function ensureAudio(){if(!audioContext)audioContext=new(window.AudioContext||window.webkitAudioContext)();if(audioContext.state==='suspended')audioContext.resume()}
+    function toggleTimer(){ensureAudio();if(timer.running){timer.remaining=Math.max(0,Math.ceil((timer.deadline-Date.now())/1000));stopInterval();timer.running=false}else{if(timer.remaining===0)timer.remaining=timer.selected;timer.running=true;timer.deadline=Date.now()+timer.remaining*1000;timer.interval=setInterval(tickTimer,250)}renderTimer()}
+    function tickTimer(){timer.remaining=Math.max(0,Math.ceil((timer.deadline-Date.now())/1000));if(timer.remaining===0){stopInterval();timer.running=false;playAlarm();showToast('Pauza skončila. Můžeš pokračovat!')}renderTimer()}
+    function resetTimer(){stopInterval();timer.running=false;timer.remaining=timer.selected;renderTimer()}
+    function playAlarm(){ensureAudio();[0,.24,.48].forEach(delay=>{const osc=audioContext.createOscillator(),gain=audioContext.createGain();osc.frequency.value=740;gain.gain.setValueAtTime(.0001,audioContext.currentTime+delay);gain.gain.exponentialRampToValueAtTime(.22,audioContext.currentTime+delay+.02);gain.gain.exponentialRampToValueAtTime(.0001,audioContext.currentTime+delay+.18);osc.connect(gain).connect(audioContext.destination);osc.start(audioContext.currentTime+delay);osc.stop(audioContext.currentTime+delay+.2)});if(navigator.vibrate)navigator.vibrate([160,90,160])}
+    function showToast(message){clearTimeout(toastTimeout);els.toast.textContent=message;els.toast.hidden=false;toastTimeout=setTimeout(()=>{els.toast.hidden=true},4200)}
+    els.finish.addEventListener('click',finishWorkout);els.timerToggle.addEventListener('click',toggleTimer);els.timerReset.addEventListener('click',resetTimer);document.querySelectorAll('.chip').forEach(chip=>chip.addEventListener('click',()=>selectTime(Number(chip.dataset.seconds))));document.querySelectorAll('.nav button').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));document.addEventListener('visibilitychange',()=>{if(!document.hidden&&timer.running)tickTimer()});
+    renderToday();renderHistory();renderTimer();
+  </script>
+</body>
+</html>

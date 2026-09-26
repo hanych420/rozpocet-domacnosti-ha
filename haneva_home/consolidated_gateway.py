@@ -20,6 +20,7 @@ WISHLIST_HTML_PATH = "/app/wishlist.html"
 RECEIPTS_HTML_PATH = "/app/receipts.html"
 INSIGHTS_HTML_PATH = "/app/insights.html"
 WORK_HTML_PATH = "/app/work.html"
+MAMA_HTML_PATH = "/app/mama.html"
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
 # po úspěšné migraci se přepne na embedded server ve stejném kontejneru.
@@ -261,6 +262,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             "/wishlist": WISHLIST_HTML_PATH, "/wishlist/": WISHLIST_HTML_PATH,
             "/uctenky": RECEIPTS_HTML_PATH, "/uctenky/": RECEIPTS_HTML_PATH,
             "/prehledy": INSIGHTS_HTML_PATH, "/prehledy/": INSIGHTS_HTML_PATH,
+            "/mama": MAMA_HTML_PATH, "/mama/": MAMA_HTML_PATH,
         }
         if path in v1_pages:
             try:
