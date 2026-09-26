@@ -370,6 +370,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             self.send_json({
                 "workouts": mama_data.get_workouts(),
                 "music_url": mama_data.get_music_url(),
+                "music_shuffle": mama_data.get_music_shuffle(),
                 "can_manage": _can_manage_mama(self),
             })
             return
@@ -637,8 +638,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 return
             try:
                 payload = self.read_json()
-                workouts, music_url = mama_data.save_settings(payload.get("workouts"), payload.get("music_url"))
-                self.send_json({"workouts": workouts, "music_url": music_url})
+                workouts, music_url, music_shuffle = mama_data.save_settings(
+                    payload.get("workouts"), payload.get("music_url"), payload.get("music_shuffle")
+                )
+                self.send_json({
+                    "workouts": workouts,
+                    "music_url": music_url,
+                    "music_shuffle": music_shuffle,
+                })
             except (ValueError, TypeError, KeyError) as exc:
                 self.send_json({"error": str(exc)}, 400)
             return

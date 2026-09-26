@@ -9,6 +9,8 @@ import gateway
 VERSION = "0.5.3"
 ICON_VERSION = "20260914-v3"
 ICON_PATH = "/app/app-icon-v3.png"
+MAMA_ICON_VERSION = "20260926-v1"
+MAMA_ICON_PATH = "/app/mama-icon-v1.png"
 
 PWA_HEAD = f"""
 <!-- haneva-pwa-v3 -->
@@ -48,6 +50,25 @@ MANIFEST = {
     ],
 }
 
+MAMA_MANIFEST = {
+    "id": "/mama",
+    "name": "Moje cvičení",
+    "short_name": "Cvičení",
+    "start_url": "/mama",
+    "scope": "/mama",
+    "display": "standalone",
+    "background_color": "#f7f0f3",
+    "theme_color": "#754668",
+    "icons": [
+        {
+            "src": f"/mama-icon-v1.png?v={MAMA_ICON_VERSION}",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable",
+        }
+    ],
+}
+
 # Rozpočet dostává horní lištu z gateway.py, proto přepíšeme i její H na stejné logo.
 gateway.BUDGET_HOME_CSS += f"""
 <style id="haneva-budget-brand-icon-v3">
@@ -70,6 +91,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
         path = urlparse(self.path).path
         icon_paths = {
             "/app-icon-v3.png",
+            "/mama-icon-v1.png",
             "/apple-touch-icon-v3.png",
             "/apple-touch-icon.png",
             "/apple-touch-icon-precomposed.png",
@@ -79,7 +101,8 @@ class IconGatewayHandler(gateway.GatewayHandler):
             return False
 
         try:
-            with open(ICON_PATH, "rb") as handle:
+            icon_path = MAMA_ICON_PATH if path == "/mama-icon-v1.png" else ICON_PATH
+            with open(icon_path, "rb") as handle:
                 body = handle.read()
         except OSError:
             self.send_bytes(b"Not found\n", 404, "text/plain; charset=utf-8")
@@ -88,7 +111,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
         self.send_response(200)
         self.send_header("Content-Type", "image/png")
         # Versioned path can be cached forever; legacy auto-discovery paths should revalidate.
-        if path in {"/app-icon-v3.png", "/apple-touch-icon-v3.png"}:
+        if path in {"/app-icon-v3.png", "/apple-touch-icon-v3.png", "/mama-icon-v1.png"}:
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:
             self.send_header("Cache-Control", "no-cache, must-revalidate")
@@ -100,9 +123,14 @@ class IconGatewayHandler(gateway.GatewayHandler):
         return True
 
     def _serve_manifest(self):
-        if urlparse(self.path).path != "/manifest.webmanifest":
+        path = urlparse(self.path).path
+        manifests = {
+            "/manifest.webmanifest": MANIFEST,
+            "/mama.webmanifest": MAMA_MANIFEST,
+        }
+        if path not in manifests:
             return False
-        body = json.dumps(MANIFEST, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        body = json.dumps(manifests[path], ensure_ascii=False, separators=(",", ":")).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/manifest+json; charset=utf-8")
         self.send_header("Cache-Control", "no-cache, must-revalidate")

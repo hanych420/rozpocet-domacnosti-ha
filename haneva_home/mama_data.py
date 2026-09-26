@@ -192,9 +192,17 @@ def save_music_url(raw):
     return music_url
 
 
-def save_settings(raw_workouts, raw_music_url):
+def get_music_shuffle():
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT value FROM mama_settings WHERE key='music_shuffle'").fetchone()
+    return bool(row and row[0] == "1")
+
+
+def save_settings(raw_workouts, raw_music_url, raw_music_shuffle=False):
     workouts = validate_workouts(raw_workouts)
     music_url = validate_music_url(raw_music_url)
+    music_shuffle = bool(raw_music_shuffle)
     init_db()
     workouts_value = json.dumps(workouts, ensure_ascii=False, separators=(",", ":"))
     with sqlite3.connect(DB_PATH) as conn:
@@ -210,5 +218,11 @@ def save_settings(raw_workouts, raw_music_url):
                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
             (music_url,),
         )
+        conn.execute(
+            """INSERT INTO mama_settings(key, value, updated_at)
+               VALUES('music_shuffle', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
+            ("1" if music_shuffle else "0",),
+        )
         conn.commit()
-    return workouts, music_url
+    return workouts, music_url, music_shuffle
