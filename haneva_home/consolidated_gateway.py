@@ -367,8 +367,11 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             self.send_json(v1_features.finance_insights())
             return
         if path == "/api/mama/workouts":
+            plans, categories = mama_data.get_training_data()
             self.send_json({
-                "workouts": mama_data.get_workouts(),
+                "plans": plans,
+                "categories": categories,
+                "workouts": mama_data.resolve_workouts(plans, categories),
                 "music_url": mama_data.get_music_url(),
                 "music_shuffle": mama_data.get_music_shuffle(),
                 "can_manage": _can_manage_mama(self),
@@ -662,10 +665,13 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 return
             try:
                 payload = self.read_json()
-                workouts, music_url, music_shuffle = mama_data.save_settings(
-                    payload.get("workouts"), payload.get("music_url"), payload.get("music_shuffle")
+                plans, categories, workouts, music_url, music_shuffle = mama_data.save_settings(
+                    payload.get("plans"), payload.get("categories"),
+                    payload.get("music_url"), payload.get("music_shuffle")
                 )
                 self.send_json({
+                    "plans": plans,
+                    "categories": categories,
                     "workouts": workouts,
                     "music_url": music_url,
                     "music_shuffle": music_shuffle,

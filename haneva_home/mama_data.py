@@ -11,27 +11,40 @@ DB_PATH = "/data/haneva_mama.db"
 MEDIA_DIR = "/data/haneva_mama_media"
 MEDIA_MAX_BYTES = 12 * 1024 * 1024
 MAX_WORKOUTS = 12
+MAX_CATEGORIES = 12
 MAX_EXERCISES = 30
 
-DEFAULT_WORKOUTS = [
-    {
-        "id": "A",
-        "name": "Nohy + ruce",
-        "exercises": [
-            {"id": "chair-squat", "name": "Dřep k židli", "sets": 3, "reps": 10, "weight": "bez zátěže", "art": "🪑", "image": ""},
-            {"id": "biceps", "name": "Bicepsový zdvih", "sets": 3, "reps": 12, "weight": "2 kg", "art": "💪", "image": ""},
-            {"id": "calf-raise", "name": "Výpony na špičky", "sets": 3, "reps": 12, "weight": "bez zátěže", "art": "🦵", "image": ""},
-        ],
-    },
-    {
-        "id": "B",
-        "name": "Nohy + břicho",
-        "exercises": [
-            {"id": "step-back", "name": "Zakročení s oporou", "sets": 3, "reps": 8, "weight": "bez zátěže", "art": "🚶", "image": ""},
-            {"id": "knee-lift", "name": "Zvedání kolen ve stoje", "sets": 3, "reps": 10, "weight": "bez zátěže", "art": "🧍", "image": ""},
-            {"id": "wall-push", "name": "Kliky o zeď", "sets": 3, "reps": 10, "weight": "bez zátěže", "art": "🙌", "image": ""},
-        ],
-    },
+def _exercise(exercise_id, name, art):
+    return {"id": exercise_id, "name": name, "sets": 3, "reps": 10, "weight": "bez zátěže", "art": art, "image": ""}
+
+
+DEFAULT_CATEGORIES = [
+    {"id": "legs", "name": "Nohy", "art": "🦵", "exercises": [
+        _exercise("legs-rumunsky-mrtvy-tah", "Rumunský mrtvý tah", "🏋️"),
+        _exercise("legs-bridge", "Bridge na pravou a levou nohu", "🍑"),
+        _exercise("legs-wall-sit", "Wall sit", "🧱"),
+        _exercise("legs-extension", "Leg extension", "🦵"),
+        _exercise("legs-bocni-vypady", "Boční výpady", "↔️"),
+    ]},
+    {"id": "arms", "name": "Ruce", "art": "💪", "exercises": [
+        _exercise("arms-tlak-ramena", "Tlak na ramena", "🏋️"),
+        _exercise("arms-kladivove-pritahy", "Kladivové přítahy", "💪"),
+        _exercise("arms-kolem-sveta", "Kolem světa", "🌍"),
+        _exercise("arms-tlak-nad-hlavou", "Tlak nad hlavou", "🙌"),
+        _exercise("arms-kombinace", "Křídla / před sebe / dolů k bokům", "↕️"),
+        _exercise("arms-biceps", "Bicepsový zdvih", "💪"),
+    ]},
+    {"id": "core", "name": "Břicho", "art": "🧘", "exercises": [
+        _exercise("core-side-plank", "Side plank", "↔️"),
+        _exercise("core-plank", "Plank", "🧘"),
+        _exercise("core-mrtvy-brouk", "Mrtvý brouk", "🐞"),
+        _exercise("core-rusky-twist", "Ruský twist", "🔄"),
+    ]},
+]
+
+DEFAULT_PLANS = [
+    {"id": "A", "categories": ["legs", "arms"], "excluded_exercises": []},
+    {"id": "B", "categories": ["legs", "core"], "excluded_exercises": []},
 ]
 
 
@@ -186,31 +199,191 @@ def validate_workouts(raw):
     return workouts
 
 
-def get_workouts():
-    init_db()
-    with sqlite3.connect(DB_PATH) as conn:
-        row = conn.execute("SELECT value FROM mama_settings WHERE key='workouts'").fetchone()
-    if row:
-        try:
-            return validate_workouts(json.loads(row[0]))
-        except (ValueError, TypeError, json.JSONDecodeError):
-            pass
-    return validate_workouts(DEFAULT_WORKOUTS)
+def _validated_exercise(item, index, category_id, used_ids):
+    if not isinstance(item, dict):
+        raise ValueError("Neplatný cvik.")
+    exercise_id = _identifier(item.get("id"), f"{category_id}-cvik-{index + 1}")
+    if exercise_id in used_ids:
+        exercise_id = f"{exercise_id}-{index + 1}"
+    used_ids.add(exercise_id)
+    return {
+        "id": exercise_id,
+        "name": _text(item.get("name"), "Název cviku", 100),
+        "sets": _number(item.get("sets"), "Počet sérií", 1, 10),
+        "reps": _number(item.get("reps"), "Počet opakování", 1, 200),
+        "weight": _text(item.get("weight"), "Váha", 60),
+        "art": str(item.get("art") or "🏋️").strip()[:12] or "🏋️",
+        "image": _image_url(item.get("image")),
+    }
 
 
-def save_workouts(raw):
-    workouts = validate_workouts(raw)
-    init_db()
-    value = json.dumps(workouts, ensure_ascii=False, separators=(",", ":"))
-    with sqlite3.connect(DB_PATH) as conn:
+def validate_categories(raw):
+    if not isinstance(raw, list) or not 1 <= len(raw) <= MAX_CATEGORIES:
+        raise ValueError(f"Musí existovat 1 až {MAX_CATEGORIES} kategorií cviků.")
+    categories = []
+    category_ids = set()
+    exercise_ids = set()
+    for category_index, source in enumerate(raw):
+        if not isinstance(source, dict):
+            raise ValueError("Neplatná kategorie cviků.")
+        category_id = _identifier(source.get("id"), f"kategorie-{category_index + 1}")
+        if category_id in category_ids:
+            raise ValueError("Každá kategorie musí být jedinečná.")
+        category_ids.add(category_id)
+        exercises_raw = source.get("exercises")
+        if not isinstance(exercises_raw, list) or len(exercises_raw) > MAX_EXERCISES:
+            raise ValueError(f"Kategorie může obsahovat nejvýše {MAX_EXERCISES} cviků.")
+        categories.append({
+            "id": category_id,
+            "name": _text(source.get("name"), "Název kategorie", 60),
+            "art": str(source.get("art") or "🏋️").strip()[:12] or "🏋️",
+            "exercises": [
+                _validated_exercise(item, exercise_index, category_id, exercise_ids)
+                for exercise_index, item in enumerate(exercises_raw)
+            ],
+        })
+    return categories
+
+
+def validate_plans(raw, categories):
+    if not isinstance(raw, list) or not 2 <= len(raw) <= MAX_WORKOUTS:
+        raise ValueError(f"Musí existovat 2 až {MAX_WORKOUTS} tréninkových dnů.")
+    allowed = {category["id"] for category in categories}
+    category_map = {category["id"]: category for category in categories}
+    plans = []
+    plan_ids = set()
+    for plan_index, source in enumerate(raw):
+        if not isinstance(source, dict):
+            raise ValueError("Neplatný tréninkový den.")
+        plan_id = _identifier(source.get("id"), chr(65 + plan_index))
+        if plan_id in plan_ids:
+            raise ValueError("Každý tréninkový den musí být jedinečný.")
+        plan_ids.add(plan_id)
+        selected = []
+        for category_id in source.get("categories") or []:
+            category_id = str(category_id)
+            if category_id in allowed and category_id not in selected:
+                selected.append(category_id)
+        if not selected:
+            raise ValueError(f"Trénink {plan_index + 1} musí obsahovat alespoň jednu kategorii.")
+        available_exercises = {
+            exercise["id"]
+            for category_id in selected
+            for exercise in category_map[category_id]["exercises"]
+        }
+        excluded = []
+        for exercise_id in source.get("excluded_exercises") or []:
+            exercise_id = str(exercise_id)
+            if exercise_id in available_exercises and exercise_id not in excluded:
+                excluded.append(exercise_id)
+        if available_exercises and len(excluded) == len(available_exercises):
+            raise ValueError(f"Trénink {plan_index + 1} musí obsahovat alespoň jeden cvik.")
+        plans.append({"id": plan_id, "categories": selected, "excluded_exercises": excluded})
+    return plans
+
+
+def resolve_workouts(plans, categories):
+    category_map = {category["id"]: category for category in categories}
+    workouts = []
+    for plan in plans:
+        selected = [category_map[item] for item in plan["categories"] if item in category_map]
+        excluded = set(plan.get("excluded_exercises") or [])
+        exercises = []
+        seen = set()
+        for category in selected:
+            for exercise in category["exercises"]:
+                if exercise["id"] not in seen and exercise["id"] not in excluded:
+                    exercises.append(dict(exercise))
+                    seen.add(exercise["id"])
+        if not exercises:
+            raise ValueError("Každý trénink musí obsahovat alespoň jeden cvik.")
+        workouts.append({
+            "id": plan["id"],
+            "name": " + ".join(category["name"] for category in selected),
+            "exercises": exercises,
+        })
+    return workouts
+
+
+def _legacy_to_library(workouts):
+    workouts = validate_workouts(workouts)
+    first, second = workouts[0], workouts[1]
+    first_by_name = {item["name"].casefold(): item for item in first["exercises"]}
+    second_by_name = {item["name"].casefold(): item for item in second["exercises"]}
+    shared_names = set(first_by_name) & set(second_by_name)
+
+    def migrated(category_id, source):
+        result = []
+        used = set()
+        for index, item in enumerate(source):
+            copy = dict(item)
+            copy["id"] = _identifier(f"{category_id}-{item['name']}", f"{category_id}-cvik-{index + 1}")
+            if copy["id"] in used:
+                copy["id"] += f"-{index + 1}"
+            used.add(copy["id"])
+            if not copy.get("image"):
+                other = second_by_name.get(item["name"].casefold())
+                if other and other.get("image"):
+                    copy["image"] = other["image"]
+            result.append(copy)
+        return result
+
+    legs_source = [item for item in first["exercises"] if item["name"].casefold() in shared_names]
+    arms_source = [item for item in first["exercises"] if item["name"].casefold() not in shared_names]
+    core_source = [item for item in second["exercises"] if item["name"].casefold() not in shared_names]
+    categories = validate_categories([
+        {"id": "legs", "name": "Nohy", "art": "🦵", "exercises": migrated("legs", legs_source)},
+        {"id": "arms", "name": "Ruce", "art": "💪", "exercises": migrated("arms", arms_source)},
+        {"id": "core", "name": "Břicho", "art": "🧘", "exercises": migrated("core", core_source)},
+    ])
+    first_categories = (["legs"] if legs_source else []) + (["arms"] if arms_source else [])
+    second_categories = (["legs"] if legs_source else []) + (["core"] if core_source else [])
+    plans = validate_plans([
+        {"id": first["id"], "categories": first_categories or ["arms"], "excluded_exercises": []},
+        {"id": second["id"], "categories": second_categories or ["core"], "excluded_exercises": []},
+    ], categories)
+    return plans, categories
+
+
+def _store_training_data(conn, plans, categories):
+    for key, value in (
+        ("training_plans", plans),
+        ("exercise_categories", categories),
+    ):
         conn.execute(
             """INSERT INTO mama_settings(key, value, updated_at)
-               VALUES('workouts', ?, CURRENT_TIMESTAMP)
+               VALUES(?, ?, CURRENT_TIMESTAMP)
                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
-            (value,),
+            (key, json.dumps(value, ensure_ascii=False, separators=(",", ":"))),
         )
+
+
+def get_training_data():
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = dict(conn.execute(
+            "SELECT key, value FROM mama_settings WHERE key IN ('training_plans','exercise_categories','workouts')"
+        ).fetchall())
+        try:
+            categories = validate_categories(json.loads(rows["exercise_categories"]))
+            plans = validate_plans(json.loads(rows["training_plans"]), categories)
+            resolve_workouts(plans, categories)
+            return plans, categories
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+            pass
+        try:
+            plans, categories = _legacy_to_library(json.loads(rows["workouts"]))
+        except (KeyError, ValueError, TypeError, json.JSONDecodeError):
+            categories = validate_categories(DEFAULT_CATEGORIES)
+            plans = validate_plans(DEFAULT_PLANS, categories)
+        _store_training_data(conn, plans, categories)
         conn.commit()
-    return workouts
+        return plans, categories
+
+
+def get_workouts():
+    plans, categories = get_training_data()
+    return resolve_workouts(plans, categories)
 
 
 def get_music_url():
@@ -246,19 +419,15 @@ def get_music_shuffle():
     return bool(row and row[0] == "1")
 
 
-def save_settings(raw_workouts, raw_music_url, raw_music_shuffle=False):
-    workouts = validate_workouts(raw_workouts)
+def save_settings(raw_plans, raw_categories, raw_music_url, raw_music_shuffle=False):
+    categories = validate_categories(raw_categories)
+    plans = validate_plans(raw_plans, categories)
+    workouts = resolve_workouts(plans, categories)
     music_url = validate_music_url(raw_music_url)
     music_shuffle = bool(raw_music_shuffle)
     init_db()
-    workouts_value = json.dumps(workouts, ensure_ascii=False, separators=(",", ":"))
     with sqlite3.connect(DB_PATH) as conn:
-        conn.execute(
-            """INSERT INTO mama_settings(key, value, updated_at)
-               VALUES('workouts', ?, CURRENT_TIMESTAMP)
-               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
-            (workouts_value,),
-        )
+        _store_training_data(conn, plans, categories)
         conn.execute(
             """INSERT INTO mama_settings(key, value, updated_at)
                VALUES('music_url', ?, CURRENT_TIMESTAMP)
@@ -272,4 +441,4 @@ def save_settings(raw_workouts, raw_music_url, raw_music_shuffle=False):
             ("1" if music_shuffle else "0",),
         )
         conn.commit()
-    return workouts, music_url, music_shuffle
+    return plans, categories, workouts, music_url, music_shuffle
