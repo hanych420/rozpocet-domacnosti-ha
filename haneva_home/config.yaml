@@ -1,5 +1,5 @@
 name: "Haneva Home"
-version: "1.0.13"
+version: "1.0.14"
 slug: "haneva_home"
 description: "Domovský přehled pro rozpočet, kalendář, domácnost a další společné aplikace."
 init: false
@@ -23,10 +23,8 @@ map:
     read_only: false
 options:
   parse_albert_products_endpoint: "get_leaflet_products"
-  mama_admin_email: ""
 schema:
   parse_api_key: "password?"
   parse_api_base: "str?"
   parse_albert_products_endpoint: "str?"
-  mama_admin_email: "str?"
 url: "https://github.com/hanych420/rozpocet-domacnosti-ha"

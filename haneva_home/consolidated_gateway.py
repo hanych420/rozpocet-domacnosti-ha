@@ -1,6 +1,5 @@
 import json
 import os
-import secrets
 from datetime import date, timedelta
 from http.server import ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse, unquote
@@ -46,9 +45,9 @@ def _mama_request_email(handler):
 
 
 def _can_manage_mama(handler):
-    expected = _mama_admin_email()
-    actual = _mama_request_email(handler)
-    return bool(expected and actual and secrets.compare_digest(expected, actual))
+    # Cvičení si smí upravovat každý uživatel, kterého ověřil Cloudflare Access.
+    # Správa uživatelů bude oddělené oprávnění pouze pro hlavního administrátora.
+    return bool(_mama_request_email(handler))
 
 # Gateway může při přechodu ještě dočasně používat starý add-on,
 # po úspěšné migraci se přepne na embedded server ve stejném kontejneru.
@@ -368,11 +367,10 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             self.send_json(v1_features.finance_insights())
             return
         if path == "/api/mama/workouts":
-            admin_email = _mama_admin_email()
             self.send_json({
                 "workouts": mama_data.get_workouts(),
+                "music_url": mama_data.get_music_url(),
                 "can_manage": _can_manage_mama(self),
-                "admin_configured": bool(admin_email),
             })
             return
 
@@ -635,11 +633,12 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         path = urlparse(self.path).path
         if path == "/api/mama/workouts":
             if not _can_manage_mama(self):
-                self.send_json({"error": "Tuto změnu může provést jen administrátor cvičení."}, 403)
+                self.send_json({"error": "Pro úpravu cvičení se nejdřív přihlas přes Cloudflare."}, 403)
                 return
             try:
                 payload = self.read_json()
-                self.send_json({"workouts": mama_data.save_workouts(payload.get("workouts"))})
+                workouts, music_url = mama_data.save_settings(payload.get("workouts"), payload.get("music_url"))
+                self.send_json({"workouts": workouts, "music_url": music_url})
             except (ValueError, TypeError, KeyError) as exc:
                 self.send_json({"error": str(exc)}, 400)
             return

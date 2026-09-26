@@ -80,6 +80,21 @@ def _image_url(value):
     return result
 
 
+def validate_music_url(value):
+    result = str(value or "").strip()
+    if not result:
+        return ""
+    if len(result) > 500:
+        raise ValueError("Adresa hudby je příliš dlouhá.")
+    parsed = urlparse(result)
+    if parsed.scheme != "https" or not parsed.netloc:
+        raise ValueError("Hudba musí mít platnou adresu začínající https://.")
+    allowed_hosts = {"open.spotify.com", "youtube.com", "www.youtube.com", "music.youtube.com", "youtu.be"}
+    if parsed.hostname not in allowed_hosts:
+        raise ValueError("Použij odkaz na Spotify nebo YouTube.")
+    return result
+
+
 def validate_workouts(raw):
     if not isinstance(raw, list) or not 2 <= len(raw) <= MAX_WORKOUTS:
         raise ValueError(f"Musí existovat 2 až {MAX_WORKOUTS} tréninkových dnů.")
@@ -149,3 +164,51 @@ def save_workouts(raw):
         )
         conn.commit()
     return workouts
+
+
+def get_music_url():
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        row = conn.execute("SELECT value FROM mama_settings WHERE key='music_url'").fetchone()
+    if not row:
+        return ""
+    try:
+        return validate_music_url(row[0])
+    except ValueError:
+        return ""
+
+
+def save_music_url(raw):
+    music_url = validate_music_url(raw)
+    init_db()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO mama_settings(key, value, updated_at)
+               VALUES('music_url', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
+            (music_url,),
+        )
+        conn.commit()
+    return music_url
+
+
+def save_settings(raw_workouts, raw_music_url):
+    workouts = validate_workouts(raw_workouts)
+    music_url = validate_music_url(raw_music_url)
+    init_db()
+    workouts_value = json.dumps(workouts, ensure_ascii=False, separators=(",", ":"))
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """INSERT INTO mama_settings(key, value, updated_at)
+               VALUES('workouts', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
+            (workouts_value,),
+        )
+        conn.execute(
+            """INSERT INTO mama_settings(key, value, updated_at)
+               VALUES('music_url', ?, CURRENT_TIMESTAMP)
+               ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP""",
+            (music_url,),
+        )
+        conn.commit()
+    return workouts, music_url
