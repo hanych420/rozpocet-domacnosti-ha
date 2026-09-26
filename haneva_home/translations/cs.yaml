@@ -1,7 +1,4 @@
 configuration:
-  mama_admin_email:
-    name: "Administrátor cvičení"
-    description: "E-mail účtu přihlášeného přes Cloudflare Access, který smí měnit tréninky a cviky. Ostatní uživatelé správu neuvidí."
   parse_api_key:
     name: "Parse.bot API klíč pro Albert"
     description: "Volitelné. Použije se pro spravované Albert API; bez klíče se Albert akce nenačítají a Haneva nepoužije Kupi ani vlastní PDF parser."
