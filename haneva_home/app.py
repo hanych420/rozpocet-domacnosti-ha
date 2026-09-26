@@ -432,7 +432,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "same-origin")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         if length is not None:
             self.send_header("Content-Length", str(length))
         self.end_headers()
@@ -453,7 +453,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "private, no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
-        self.send_header("Referrer-Policy", "same-origin")
+        self.send_header("Referrer-Policy", "strict-origin-when-cross-origin")
         if filename:
             fallback = re.sub(r"[^A-Za-z0-9._-]", "_", filename) or "ticket"
             from urllib.parse import quote
