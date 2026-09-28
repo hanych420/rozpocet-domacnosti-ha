@@ -9,7 +9,7 @@ import gateway
 VERSION = "0.5.3"
 ICON_VERSION = "20260914-v3"
 ICON_PATH = "/app/app-icon-v3.png"
-MAMA_ICON_VERSION = "20260926-v1"
+MAMA_ICON_VERSION = "20260928-v2"
 MAMA_ICON_PATH = "/app/mama-icon-v1.png"
 
 PWA_HEAD = f"""
@@ -61,7 +61,7 @@ MAMA_MANIFEST = {
     "theme_color": "#754668",
     "icons": [
         {
-            "src": f"/mama-icon-v1.png?v={MAMA_ICON_VERSION}",
+            "src": f"/mama/icon-v2.png?v={MAMA_ICON_VERSION}",
             "sizes": "512x512",
             "type": "image/png",
             "purpose": "any maskable",
@@ -92,6 +92,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
         icon_paths = {
             "/app-icon-v3.png",
             "/mama-icon-v1.png",
+            "/mama/icon-v2.png",
             "/apple-touch-icon-v3.png",
             "/apple-touch-icon.png",
             "/apple-touch-icon-precomposed.png",
@@ -101,7 +102,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
             return False
 
         try:
-            icon_path = MAMA_ICON_PATH if path == "/mama-icon-v1.png" else ICON_PATH
+            icon_path = MAMA_ICON_PATH if path in {"/mama-icon-v1.png", "/mama/icon-v2.png"} else ICON_PATH
             with open(icon_path, "rb") as handle:
                 body = handle.read()
         except OSError:
@@ -111,7 +112,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
         self.send_response(200)
         self.send_header("Content-Type", "image/png")
         # Versioned path can be cached forever; legacy auto-discovery paths should revalidate.
-        if path in {"/app-icon-v3.png", "/apple-touch-icon-v3.png", "/mama-icon-v1.png"}:
+        if path in {"/app-icon-v3.png", "/apple-touch-icon-v3.png", "/mama-icon-v1.png", "/mama/icon-v2.png"}:
             self.send_header("Cache-Control", "public, max-age=31536000, immutable")
         else:
             self.send_header("Cache-Control", "no-cache, must-revalidate")
@@ -127,6 +128,7 @@ class IconGatewayHandler(gateway.GatewayHandler):
         manifests = {
             "/manifest.webmanifest": MANIFEST,
             "/mama.webmanifest": MAMA_MANIFEST,
+            "/mama/manifest.webmanifest": MAMA_MANIFEST,
         }
         if path not in manifests:
             return False
