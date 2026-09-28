@@ -92,7 +92,10 @@ def _image_url(value):
         return ""
     if len(result) > 500:
         raise ValueError("Adresa obrázku je příliš dlouhá.")
-    if re.fullmatch(r"/api/mama/media/[a-f0-9]{32}\.(?:gif|jpe?g|png|webp)", result):
+    legacy = re.fullmatch(r"/api/mama/media/([a-f0-9]{32}\.(?:gif|jpe?g|png|webp))", result)
+    if legacy:
+        return f"/mama/api/media/{legacy.group(1)}"
+    if re.fullmatch(r"/mama/api/media/[a-f0-9]{32}\.(?:gif|jpe?g|png|webp)", result):
         return result
     parsed = urlparse(result)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
@@ -120,7 +123,7 @@ def save_media(original_name, body):
     Path(MEDIA_DIR).mkdir(parents=True, exist_ok=True)
     (Path(MEDIA_DIR) / filename).write_bytes(body)
     return {
-        "url": f"/api/mama/media/{filename}",
+        "url": f"/mama/api/media/{filename}",
         "name": Path(original_name or ("napoveda" + suffix)).name[:180],
         "mime": mime,
     }

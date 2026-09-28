@@ -366,7 +366,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         if path == "/api/v1/insights":
             self.send_json(v1_features.finance_insights())
             return
-        if path == "/api/mama/workouts":
+        if path in ("/api/mama/workouts", "/mama/api/workouts"):
             plans, categories = mama_data.get_training_data()
             self.send_json({
                 "plans": plans,
@@ -377,7 +377,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 "can_manage": _can_manage_mama(self),
             })
             return
-        if path.startswith("/api/mama/media/"):
+        if path.startswith("/api/mama/media/") or path.startswith("/mama/api/media/"):
             filename = unquote(path.rsplit("/", 1)[-1])
             try:
                 body, mime = mama_data.read_media(filename)
@@ -447,7 +447,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         path = urlparse(self.path).path
 
         try:
-            if path == "/api/mama/media":
+            if path in ("/api/mama/media", "/mama/api/media"):
                 if not _can_manage_mama(self):
                     self.send_json({"error": "Pro nahrání nápovědy se nejdřív přihlas přes Cloudflare."}, 403)
                     return
@@ -659,7 +659,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
     def do_PUT(self):
         path = urlparse(self.path).path
-        if path == "/api/mama/workouts":
+        if path in ("/api/mama/workouts", "/mama/api/workouts"):
             if not _can_manage_mama(self):
                 self.send_json({"error": "Pro úpravu cvičení se nejdřív přihlas přes Cloudflare."}, 403)
                 return
