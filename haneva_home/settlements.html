@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>Vyrovnání mezi námi · Haneva</title>
+  <style>
+    :root{--bg:#f3f5f9;--card:#fff;--text:#172033;--muted:#697386;--line:#e5e9f1;--dark:#111827;--hanych:#2563eb;--eva:#db2777;--green:#059669;--red:#b91c1c}
+    *{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#f8fafc,#eef2f7);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.wrap{width:min(1080px,calc(100% - 28px));margin:auto;padding:24px 0 54px}.top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:28px}.brand{display:flex;align-items:center;gap:11px;color:inherit;text-decoration:none;font-weight:850}.brand-mark{display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:#111827;color:#fff}.back{color:#586174;text-decoration:none;font-size:13px;font-weight:750}.head{display:flex;align-items:end;justify-content:space-between;gap:18px;margin-bottom:18px}.head h1{margin:0 0 5px;font-size:clamp(31px,5vw,48px);letter-spacing:-.04em}.head p{margin:0;color:var(--muted)}.period{border:1px solid var(--line);border-radius:12px;background:#fff;padding:10px 12px;color:var(--text);font:inherit;font-weight:750}.grid{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr);gap:16px}.card{border:1px solid rgba(255,255,255,.92);border-radius:22px;background:rgba(255,255,255,.9);padding:21px;box-shadow:0 15px 42px rgba(31,41,55,.08)}.balance-card{grid-column:1/-1}.kicker{color:var(--muted);font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.06em}.balance-copy{margin:8px 0 4px;font-size:clamp(25px,5vw,42px);font-weight:900;letter-spacing:-.035em}.balance-note{color:var(--muted);font-size:13px}.balance-track{position:relative;height:54px;margin:24px 0 3px}.balance-line{position:absolute;left:0;right:0;top:23px;height:8px;border-radius:99px;background:linear-gradient(90deg,#dbeafe 0 49%,#e5e7eb 49% 51%,#fce7f3 51%)}.balance-center{position:absolute;left:50%;top:16px;width:2px;height:22px;background:#9ca3af}.balance-marker{position:absolute;top:14px;left:50%;width:26px;height:26px;border:4px solid #fff;border-radius:50%;background:var(--green);box-shadow:0 4px 14px rgba(31,41,55,.22);transform:translateX(-50%);transition:left .3s}.track-labels{display:flex;justify-content:space-between;color:var(--muted);font-size:11px;font-weight:800}.card h2{margin:0 0 15px;font-size:20px}.mode{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}.mode label{cursor:pointer}.mode input{position:absolute;opacity:0}.mode span{display:block;height:100%;border:1px solid var(--line);border-radius:13px;padding:12px;background:#f8fafc;font-size:12px;font-weight:800}.mode input:checked+span{border-color:#111827;background:#111827;color:#fff}.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field{display:flex;flex-direction:column;gap:6px}.field.full{grid-column:1/-1}.field label{color:#596174;font-size:11px;font-weight:800}.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:12px;background:#fff;color:var(--text);padding:11px 12px;font:inherit}.field textarea{min-height:74px;resize:vertical}.help{margin:10px 0 0;color:var(--muted);font-size:11px;line-height:1.45}.actions{display:flex;gap:8px;margin-top:15px}.primary,.secondary,.danger{border:0;border-radius:12px;padding:11px 15px;font:inherit;font-weight:850;cursor:pointer}.primary{background:#111827;color:#fff}.secondary{background:#eef1f6;color:#364152}.danger{background:#fff0f0;color:var(--red)}.hidden{display:none!important}.paid-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.paid-box{padding:15px;border-radius:16px;background:#f7f9fc}.paid-head{display:flex;justify-content:space-between;gap:8px;font-size:12px;font-weight:850}.paid-value{margin-top:7px;font-size:24px;font-weight:900}.bar{height:10px;margin-top:12px;border-radius:99px;background:#e8edf4;overflow:hidden}.bar span{display:block;height:100%;border-radius:inherit}.hanych .bar span{background:var(--hanych)}.eva .bar span{background:var(--eva)}.list-card{grid-column:1/-1}.entry{display:grid;grid-template-columns:auto 1fr auto auto;align-items:center;gap:9px;padding:13px 0;border-bottom:1px solid var(--line)}.entry:last-child{border-bottom:0}.entry-icon{display:grid;place-items:center;width:36px;height:36px;border-radius:12px;background:#f1f4f8}.entry-title{font-weight:850}.entry-meta{margin-top:3px;color:var(--muted);font-size:11px}.entry-amount{font-weight:900;white-space:nowrap}.icon-btn{display:grid;place-items:center;width:35px;height:35px;border:0;border-radius:11px;background:#f2f4f8;color:#586174;cursor:pointer}.empty{padding:22px;border-radius:16px;background:#f7f9fc;color:var(--muted);text-align:center}.toast{position:fixed;right:18px;bottom:18px;max-width:min(390px,calc(100% - 36px));border-radius:14px;background:#111827;color:#fff;padding:13px 16px;font-size:13px;font-weight:750;box-shadow:0 15px 35px rgba(17,24,39,.25)}.toast.error{background:#991b1b}
+    .entry-actions{display:flex;gap:6px}
+    @media(max-width:720px){.wrap{width:min(100% - 18px,1080px);padding-top:15px}.top{margin-bottom:22px}.head{align-items:flex-start;flex-direction:column}.period{width:100%}.grid{grid-template-columns:1fr}.balance-card,.list-card{grid-column:auto}.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.paid-grid{grid-template-columns:1fr 1fr}.entry{grid-template-columns:auto 1fr auto}.entry-actions{grid-column:3;grid-row:1/3}.entry-amount{grid-column:2;grid-row:2}.card{padding:17px;border-radius:18px}}
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <div class="top"><a class="brand" href="/"><span class="brand-mark">H</span><span>Haneva</span></a><a class="back" href="/rozpocet/">← Zpět do financí</a></div>
+    <section class="head"><div><h1>Vyrovnání mezi námi</h1><p>Společné věci zaplacené ze soukromých účtů, přehledně a bez dohadů.</p></div><select class="period" id="month" aria-label="Zobrazený měsíc"></select></section>
+    <section class="grid">
+      <article class="card balance-card">
+        <div class="kicker">Aktuálně k vyrovnání</div>
+        <div class="balance-copy" id="balanceText">Načítám…</div>
+        <div class="balance-note">Saldo je průběžné napříč všemi měsíci. Společné nákupy se dělí rovným dílem.</div>
+        <div class="balance-track"><div class="balance-line"></div><div class="balance-center"></div><div class="balance-marker" id="balanceMarker"></div></div>
+        <div class="track-labels"><span>ve prospěch Hanycha</span><span>vyrovnáno</span><span>ve prospěch Evy</span></div>
+      </article>
+      <article class="card">
+        <h2 id="formTitle">Přidat platbu ze svého</h2>
+        <form id="entryForm">
+          <input type="hidden" name="id">
+          <div class="mode">
+            <label><input type="radio" name="entry_type" value="expense" checked><span>🧾 Platba ze svého</span></label>
+            <label><input type="radio" name="entry_type" value="settlement"><span>↔️ Vyrovnání</span></label>
+          </div>
+          <div class="form-grid">
+            <div class="field"><label for="paidBy">Kdo platil</label><select id="paidBy" name="paid_by"><option value="hanych">Hanych</option><option value="eva">Eva</option></select></div>
+            <div class="field"><label for="amount">Částka v Kč</label><input id="amount" name="amount" type="number" min="0.01" max="10000000" step="0.01" inputmode="decimal" required></div>
+            <div class="field full" id="titleField"><label for="title">Za co</label><input id="title" name="title" maxlength="160" placeholder="Např. veterinář, nákup, vstupenky"></div>
+            <div class="field"><label for="occurredOn">Datum</label><input id="occurredOn" name="occurred_on" type="date" required></div>
+            <div class="field"><label for="note">Poznámka</label><input id="note" name="note" maxlength="500" placeholder="Volitelné"></div>
+          </div>
+          <p class="help" id="formHelp">Do salda se započítá polovina částky ve prospěch člověka, který společnou věc zaplatil.</p>
+          <div class="actions"><button class="primary" id="save" type="submit">Uložit platbu</button><button class="secondary hidden" id="cancelEdit" type="button">Zrušit úpravu</button></div>
+        </form>
+      </article>
+      <article class="card">
+        <h2 id="paidHeading">Zaplaceno ze svého</h2>
+        <div class="paid-grid">
+          <div class="paid-box hanych"><div class="paid-head"><span>Hanych</span><span id="hanychShare">0 %</span></div><div class="paid-value" id="hanychPaid">—</div><div class="bar"><span id="hanychBar"></span></div></div>
+          <div class="paid-box eva"><div class="paid-head"><span>Eva</span><span id="evaShare">0 %</span></div><div class="paid-value" id="evaPaid">—</div><div class="bar"><span id="evaBar"></span></div></div>
+        </div>
+        <p class="help" id="monthTotal">Načítám měsíční souhrn…</p>
+      </article>
+      <article class="card list-card"><h2>Záznamy za vybraný měsíc</h2><div id="entries"><div class="empty">Načítám…</div></div></article>
+    </section>
+  </main>
+  <div class="toast hidden" id="toast"></div>
+  <script>
+    const $=id=>document.getElementById(id);let state=null;
+    const money=value=>new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:2}).format(Number(value)||0);
+    const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+    const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
+    async function api(url,options={}){options.cache='no-store';if(options.body&&typeof options.body!=='string'){options.headers={'Content-Type':'application/json',...(options.headers||{})};options.body=JSON.stringify(options.body)}const response=await fetch(url,options),data=await response.json();if(!response.ok)throw new Error(data.error||'Požadavek se nezdařil.');return data}
+    function notify(message,error=false){const box=$('toast');box.textContent=message;box.className='toast'+(error?' error':'');clearTimeout(notify.timer);notify.timer=setTimeout(()=>box.classList.add('hidden'),3400)}
+    function syncType(){const type=new FormData($('entryForm')).get('entry_type'),settlement=type==='settlement';$('titleField').classList.toggle('hidden',settlement);$('title').required=!settlement;$('formHelp').textContent=settlement?'Zapiš skutečně odeslanou částku. Saldo se o ni sníží, ale nebude se počítat jako další výdaj.':'Do salda se započítá polovina částky ve prospěch člověka, který společnou věc zaplatil.';$('save').textContent=settlement?'Uložit vyrovnání':'Uložit platbu'}
+    function render(){
+      $('month').innerHTML=state.available_months.map(item=>`<option value="${item.value}"${item.value===state.month?' selected':''}>${esc(item.label)}</option>`).join('');
+      $('balanceText').textContent=state.balance_status.text;
+      const balance=Number(state.balance)||0,max=Math.max(Math.abs(balance),1000),position=50-(balance/max*42);$('balanceMarker').style.left=Math.max(8,Math.min(92,position))+'%';$('balanceMarker').style.background=Math.abs(balance)<.01?'#059669':balance>0?'#2563eb':'#db2777';
+      const h=Number(state.paid.hanych)||0,e=Number(state.paid.eva)||0,total=h+e,hPct=total?h/total*100:0,ePct=total?e/total*100:0;
+      $('hanychPaid').textContent=money(h);$('evaPaid').textContent=money(e);$('hanychShare').textContent=Math.round(hPct)+' %';$('evaShare').textContent=Math.round(ePct)+' %';$('hanychBar').style.width=hPct+'%';$('evaBar').style.width=ePct+'%';$('monthTotal').textContent='Celkem ze soukromých účtů: '+money(total)+'. Tyto platby nemění zůstatek společného účtu.';
+      $('entries').innerHTML=state.entries.length?state.entries.map(entry=>`<div class="entry"><div class="entry-icon">${entry.entry_type==='expense'?'🧾':'↔️'}</div><div><div class="entry-title">${entry.entry_type==='settlement'?esc('Vyrovnání · '+entry.paid_by_name+' → '+entry.received_by_name):esc(entry.title)}</div><div class="entry-meta">${esc(entry.occurred_on)}${entry.entry_type==='expense'?' · '+esc(entry.paid_by_name):''}${entry.note?' · '+esc(entry.note):''}</div></div><div class="entry-amount">${money(entry.amount)}</div><div class="entry-actions"><button class="icon-btn" type="button" data-edit="${entry.id}" title="Upravit">✏️</button><button class="icon-btn" type="button" data-delete="${entry.id}" title="Smazat">×</button></div></div>`).join(''):'<div class="empty">V tomto měsíci zatím není žádný záznam.</div>';
+    }
+    async function load(month=''){try{state=await api('/api/v1/settlements'+(month?'?month='+encodeURIComponent(month):''));render()}catch(error){notify(error.message,true)}}
+    function resetForm(){const form=$('entryForm');form.reset();form.elements.id.value='';form.elements.occurred_on.value=localDate();$('formTitle').textContent='Přidat platbu ze svého';$('cancelEdit').classList.add('hidden');syncType()}
+    function editEntry(id){const entry=state.entries.find(item=>item.id===Number(id));if(!entry)return;const form=$('entryForm');form.elements.id.value=entry.id;form.elements.entry_type.value=entry.entry_type;form.elements.paid_by.value=entry.paid_by;form.elements.amount.value=entry.amount;form.elements.title.value=entry.title;form.elements.occurred_on.value=entry.occurred_on;form.elements.note.value=entry.note;$('formTitle').textContent='Upravit záznam';$('cancelEdit').classList.remove('hidden');syncType();form.scrollIntoView({behavior:'smooth',block:'center'})}
+    $('entryForm').addEventListener('change',event=>{if(event.target.name==='entry_type')syncType()});
+    $('entryForm').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,payload=Object.fromEntries(new FormData(form).entries()),id=payload.id;delete payload.id;$('save').disabled=true;try{await api('/api/v1/settlements'+(id?'/'+id:''),{method:id?'PUT':'POST',body:payload});notify(id?'Záznam byl upraven.':'Záznam byl uložen.');resetForm();await load($('month').value)}catch(error){notify(error.message,true)}finally{$('save').disabled=false}});
+    $('entries').addEventListener('click',async event=>{const edit=event.target.closest('[data-edit]'),del=event.target.closest('[data-delete]');if(edit){editEntry(edit.dataset.edit);return}if(del&&confirm('Opravdu tento záznam smazat?')){try{await api('/api/v1/settlements/'+del.dataset.delete,{method:'DELETE'});notify('Záznam byl smazán.');await load($('month').value)}catch(error){notify(error.message,true)}}});
+    $('cancelEdit').onclick=resetForm;$('month').onchange=()=>load($('month').value);resetForm();load();
+  </script>
+</body>
+</html>

@@ -36,16 +36,18 @@ BUDGET_HOME_CSS = """
 <style id="haneva-budget-home-style">
 .haneva-budget-navwrap{width:min(1240px,calc(100% - 28px));margin:0 auto;padding:22px 0 0;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
 .haneva-budget-topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:28px}
+.haneva-budget-actions{display:flex;align-items:center;gap:9px}
 .haneva-budget-brand{display:flex;align-items:center;gap:12px;color:#172033!important;text-decoration:none!important;font-weight:800;line-height:1}
 .haneva-budget-brand-mark{width:40px;height:40px;display:grid;place-items:center;border-radius:13px;background:#111827;color:#fff;font-size:16px;font-weight:850}
 .haneva-budget-back{display:inline-flex;align-items:center;gap:8px;color:#596174!important;text-decoration:none!important;font-size:14px;font-weight:700}
-.haneva-budget-brand:hover,.haneva-budget-back:hover{opacity:.82}
-@media(max-width:760px){.haneva-budget-navwrap{width:min(100% - 18px,1240px);padding-top:14px}.haneva-budget-topbar{margin-bottom:22px}.haneva-budget-brand-mark{width:40px;height:40px;border-radius:13px}.haneva-budget-back{font-size:12px}}
+.haneva-budget-settlement{display:inline-flex;align-items:center;gap:7px;border-radius:11px;background:#111827;color:#fff!important;padding:10px 12px;text-decoration:none!important;font-size:12px;font-weight:800}
+.haneva-budget-brand:hover,.haneva-budget-back:hover,.haneva-budget-settlement:hover{opacity:.82}
+@media(max-width:760px){.haneva-budget-navwrap{width:min(100% - 18px,1240px);padding-top:14px}.haneva-budget-topbar{align-items:flex-start;margin-bottom:22px}.haneva-budget-actions{align-items:flex-end;flex-direction:column}.haneva-budget-brand-mark{width:40px;height:40px;border-radius:13px}.haneva-budget-back{font-size:11px}.haneva-budget-settlement{padding:9px 10px;font-size:11px}}
 </style>
 """
 
 BUDGET_HOME_HTML = """
-<div class="haneva-budget-navwrap" id="haneva-budget-homebar"><div class="haneva-budget-topbar"><a class="haneva-budget-brand" href="/" aria-label="Zpět na hlavní menu Haneva"><span class="haneva-budget-brand-mark">H</span><span>Haneva</span></a><a class="haneva-budget-back" href="/">← Zpět na přehled</a></div></div>
+<div class="haneva-budget-navwrap" id="haneva-budget-homebar"><div class="haneva-budget-topbar"><a class="haneva-budget-brand" href="/" aria-label="Zpět na hlavní menu Haneva"><span class="haneva-budget-brand-mark">H</span><span>Haneva</span></a><div class="haneva-budget-actions"><a class="haneva-budget-settlement" href="/vyrovnani">⚖️ Vyrovnání mezi námi</a><a class="haneva-budget-back" href="/">← Zpět na přehled</a></div></div></div>
 """
 
 
