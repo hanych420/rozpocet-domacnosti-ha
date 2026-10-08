@@ -60,6 +60,23 @@ def add_budget_home_link(text):
     return text
 
 
+def add_budget_settlement_nav(text):
+    """Add settlement tracking to the legacy finance navigation.
+
+    The link intentionally points outside ``/rozpocet``.  This function runs
+    after legacy links are rewritten, so the main Haneva gateway receives it.
+    """
+    if "haneva-budget-settlement-nav" in text or "topnav" not in text:
+        return text
+    return re.sub(
+        r'(<nav\b[^>]*class=["\'][^"\']*\btopnav\b[^"\']*["\'][^>]*>)(.*?)(</nav>)',
+        r'\1\2<a class="haneva-budget-settlement-nav" href="/vyrovnani">⚖️ Vyrovnání</a>\3',
+        text,
+        count=1,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+
 def rewrite_budget_text(text):
     text = text.replace("https://rozpocet.haneva.cz/", "/rozpocet/")
     text = text.replace("http://rozpocet.haneva.cz/", "/rozpocet/")
@@ -82,7 +99,8 @@ def rewrite_budget_text(text):
         text,
     )
 
-    return add_budget_home_link(text)
+    text = add_budget_home_link(text)
+    return add_budget_settlement_nav(text)
 
 
 def rewrite_location(value):
