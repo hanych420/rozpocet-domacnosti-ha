@@ -55,12 +55,14 @@
   </main>
   <div class="toast hidden" id="toast"></div>
   <script>
-    const $=id=>document.getElementById(id);let state=null;
+    const $=id=>document.getElementById(id);let state=null,currentPerson='hanych';
     const money=value=>new Intl.NumberFormat('cs-CZ',{style:'currency',currency:'CZK',maximumFractionDigits:2}).format(Number(value)||0);
     const localDate=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
     const esc=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[char]));
     async function api(url,options={}){options.cache='no-store';if(options.body&&typeof options.body!=='string'){options.headers={'Content-Type':'application/json',...(options.headers||{})};options.body=JSON.stringify(options.body)}const response=await fetch(url,options),data=await response.json();if(!response.ok)throw new Error(data.error||'Požadavek se nezdařil.');return data}
     function notify(message,error=false){const box=$('toast');box.textContent=message;box.className='toast'+(error?' error':'');clearTimeout(notify.timer);notify.timer=setTimeout(()=>box.classList.add('hidden'),3400)}
+    function paidByForSession(session={}){const person=String(session.person||'').trim().toLowerCase();if(person==='hanych'||person==='eva')return person;const email=String(session.email||'').trim().toLowerCase();if(email==='hanych420@gmail.com')return 'hanych';if(session.access_detected&&email)return 'eva';return 'hanych'}
+    async function loadCurrentPerson(){try{currentPerson=paidByForSession(await api('/api/session'))}catch(_){currentPerson='hanych'}}
     function syncType(){const type=new FormData($('entryForm')).get('entry_type'),settlement=type==='settlement';$('titleField').classList.toggle('hidden',settlement);$('title').required=!settlement;$('formHelp').textContent=settlement?'Zapiš skutečně odeslanou částku. Saldo se o ni sníží, ale nebude se počítat jako další výdaj.':'Do salda se započítá polovina částky ve prospěch člověka, který společnou věc zaplatil.';$('save').textContent=settlement?'Uložit vyrovnání':'Uložit platbu'}
     function render(){
       $('month').innerHTML=state.available_months.map(item=>`<option value="${item.value}"${item.value===state.month?' selected':''}>${esc(item.label)}</option>`).join('');
@@ -71,12 +73,12 @@
       $('entries').innerHTML=state.entries.length?state.entries.map(entry=>`<div class="entry"><div class="entry-icon">${entry.entry_type==='expense'?'🧾':'↔️'}</div><div><div class="entry-title">${entry.entry_type==='settlement'?esc('Vyrovnání · '+entry.paid_by_name+' → '+entry.received_by_name):esc(entry.title)}</div><div class="entry-meta">${esc(entry.occurred_on)}${entry.entry_type==='expense'?' · '+esc(entry.paid_by_name):''}${entry.note?' · '+esc(entry.note):''}</div></div><div class="entry-amount">${money(entry.amount)}</div><div class="entry-actions"><button class="icon-btn" type="button" data-edit="${entry.id}" title="Upravit">✏️</button><button class="icon-btn" type="button" data-delete="${entry.id}" title="Smazat">×</button></div></div>`).join(''):'<div class="empty">V tomto měsíci zatím není žádný záznam.</div>';
     }
     async function load(month=''){try{state=await api('/api/v1/settlements'+(month?'?month='+encodeURIComponent(month):''));render()}catch(error){notify(error.message,true)}}
-    function resetForm(){const form=$('entryForm');form.reset();form.elements.id.value='';form.elements.occurred_on.value=localDate();$('formTitle').textContent='Přidat platbu ze svého';$('cancelEdit').classList.add('hidden');syncType()}
+    function resetForm(){const form=$('entryForm');form.reset();form.elements.id.value='';form.elements.paid_by.value=currentPerson;form.elements.occurred_on.value=localDate();$('formTitle').textContent='Přidat platbu ze svého';$('cancelEdit').classList.add('hidden');syncType()}
     function editEntry(id){const entry=state.entries.find(item=>item.id===Number(id));if(!entry)return;const form=$('entryForm');form.elements.id.value=entry.id;form.elements.entry_type.value=entry.entry_type;form.elements.paid_by.value=entry.paid_by;form.elements.amount.value=entry.amount;form.elements.title.value=entry.title;form.elements.occurred_on.value=entry.occurred_on;form.elements.note.value=entry.note;$('formTitle').textContent='Upravit záznam';$('cancelEdit').classList.remove('hidden');syncType();form.scrollIntoView({behavior:'smooth',block:'center'})}
     $('entryForm').addEventListener('change',event=>{if(event.target.name==='entry_type')syncType()});
     $('entryForm').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,payload=Object.fromEntries(new FormData(form).entries()),id=payload.id;delete payload.id;$('save').disabled=true;try{await api('/api/v1/settlements'+(id?'/'+id:''),{method:id?'PUT':'POST',body:payload});notify(id?'Záznam byl upraven.':'Záznam byl uložen.');resetForm();await load($('month').value)}catch(error){notify(error.message,true)}finally{$('save').disabled=false}});
     $('entries').addEventListener('click',async event=>{const edit=event.target.closest('[data-edit]'),del=event.target.closest('[data-delete]');if(edit){editEntry(edit.dataset.edit);return}if(del&&confirm('Opravdu tento záznam smazat?')){try{await api('/api/v1/settlements/'+del.dataset.delete,{method:'DELETE'});notify('Záznam byl smazán.');await load($('month').value)}catch(error){notify(error.message,true)}}});
-    $('cancelEdit').onclick=resetForm;$('month').onchange=()=>load($('month').value);resetForm();load();
+    $('cancelEdit').onclick=resetForm;$('month').onchange=()=>load($('month').value);(async()=>{await loadCurrentPerson();resetForm();load()})();
   </script>
 </body>
 </html>
