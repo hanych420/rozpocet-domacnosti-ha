@@ -14,6 +14,7 @@ import home_control
 import v1_features
 import mama_data
 import settlements
+import packing
 
 VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
@@ -23,6 +24,7 @@ WISHLIST_HTML_PATH = "/app/wishlist.html"
 RECEIPTS_HTML_PATH = "/app/receipts.html"
 INSIGHTS_HTML_PATH = "/app/insights.html"
 SETTLEMENTS_HTML_PATH = "/app/settlements.html"
+PACKING_HTML_PATH = "/app/packing.html"
 WORK_HTML_PATH = "/app/work.html"
 MAMA_HTML_PATH = "/app/mama.html"
 
@@ -292,6 +294,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             "/uctenky": RECEIPTS_HTML_PATH, "/uctenky/": RECEIPTS_HTML_PATH,
             "/prehledy": INSIGHTS_HTML_PATH, "/prehledy/": INSIGHTS_HTML_PATH,
             "/vyrovnani": SETTLEMENTS_HTML_PATH, "/vyrovnani/": SETTLEMENTS_HTML_PATH,
+            "/baleni": PACKING_HTML_PATH, "/baleni/": PACKING_HTML_PATH,
             "/mama": MAMA_HTML_PATH, "/mama/": MAMA_HTML_PATH,
         }
         if path in v1_pages:
@@ -377,6 +380,9 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 self.send_json(settlements.summary(query.get("month", [None])[0]))
             except ValueError as exc:
                 self.send_json({"error": str(exc)}, 400)
+            return
+        if path == "/api/v1/packing":
+            self.send_json(packing.state())
             return
         if path in ("/api/mama/workouts", "/mama/api/workouts"):
             plans, categories = mama_data.get_training_data()
@@ -494,6 +500,17 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 return
             if path == "/api/v1/settlements":
                 self.send_json({"entry": settlements.save_entry(self.read_json())}, 201)
+                return
+            if path == "/api/v1/packing/trips":
+                self.send_json({"trip": packing.save_trip(self.read_json())}, 201)
+                return
+            match = __import__("re").fullmatch(r"/api/v1/packing/trips/(\d+)/items", path)
+            if match:
+                self.send_json({"item": packing.save_item(self.read_json(), trip_id=int(match.group(1)))}, 201)
+                return
+            match = __import__("re").fullmatch(r"/api/v1/packing/trips/(\d+)/essentials", path)
+            if match:
+                self.send_json(packing.add_essentials(int(match.group(1))), 201)
                 return
             if path == "/api/v1/recipes/import-xlsx/preview":
                 try:
@@ -703,6 +720,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             if match:
                 self.send_json({"entry": settlements.save_entry(self.read_json(), int(match.group(1)))})
                 return
+            match = __import__("re").fullmatch(r"/api/v1/packing/trips/(\d+)", path)
+            if match:
+                self.send_json({"trip": packing.save_trip(self.read_json(), int(match.group(1)))})
+                return
+            match = __import__("re").fullmatch(r"/api/v1/packing/items/(\d+)", path)
+            if match:
+                self.send_json({"item": packing.save_item(self.read_json(), item_id=int(match.group(1)))})
+                return
             match = __import__("re").fullmatch(r"/api/v1/planned/(\d+)", path)
             if match:
                 payload = self.read_json()
@@ -740,6 +765,16 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 settlements.delete_entry(int(match.group(1)))
                 self.send_json({"ok": True})
                 return
+            match = __import__("re").fullmatch(r"/api/v1/packing/trips/(\d+)", path)
+            if match:
+                packing.delete_trip(int(match.group(1)))
+                self.send_json({"ok": True})
+                return
+            match = __import__("re").fullmatch(r"/api/v1/packing/items/(\d+)", path)
+            if match:
+                packing.delete_item(int(match.group(1)))
+                self.send_json({"ok": True})
+                return
             match = __import__("re").fullmatch(r"/api/v1/wishlist/(\d+)", path)
             if match:
                 v1_features.delete_wishlist(int(match.group(1)))
@@ -752,7 +787,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
     def do_HEAD(self):
         path = urlparse(self.path).path
-        if path in ("/domov", "/domov/"):
+        if path in ("/domov", "/domov/", "/baleni", "/baleni/"):
             self.send_common_headers(200, "text/html; charset=utf-8", 0)
             return
         super().do_HEAD()
@@ -764,6 +799,7 @@ if __name__ == "__main__":
     home_control.init_db()
     v1_features.init_db()
     settlements.init_db()
+    packing.init_db()
     mama_data.init_db()
     shopping_official.init_db()
     shopping_official.start_worker()
