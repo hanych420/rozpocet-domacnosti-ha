@@ -49,22 +49,28 @@ class ChristmasTest(unittest.TestCase):
         self.assertEqual(visible["reservation"]["reserved_by"], "tatinek")
         self.assertEqual(visible["reservation"]["reserved_by_name"], "Tatínek")
 
-    def test_both_parents_are_recipients_of_joint_wish(self):
-        wish = self.create_wish("rodice", "maminka")
-        for actor in ("maminka", "tatinek"):
-            item = next(g for g in christmas.state(actor)["groups"] if g["key"] == "rodice")["wishes"][0]
-            self.assertFalse(item["reservation_visible"])
-            self.assertNotIn("reservation", item)
-            with self.assertRaises(PermissionError):
-                christmas.set_reservation(wish["id"], actor, True)
+    def test_user_can_only_add_to_own_list(self):
+        with self.assertRaises(PermissionError):
+            self.create_wish("maminka", "honzicek")
+        with self.assertRaises(PermissionError):
+            self.create_wish("rodice", "maminka")
+        with self.assertRaises(PermissionError):
+            self.create_wish("babicka", "maminka")
 
-    def test_grandparent_lists_are_visible_to_all_active_users(self):
-        wish = self.create_wish("babicka", "maminka")
-        christmas.set_reservation(wish["id"], "lukasek", True)
-        for actor in christmas.USERS:
-            group = next(g for g in christmas.state(actor)["groups"] if g["key"] == "babicka")
-            self.assertTrue(group["wishes"][0]["reservation_visible"])
-            self.assertEqual(group["wishes"][0]["reservation"]["reserved_by"], "lukasek")
+    def test_only_own_group_allows_adding(self):
+        state = christmas.state("honzicek")
+        allowed = [group["key"] for group in state["groups"] if group["can_add"]]
+        self.assertEqual(allowed, ["honzicek"])
+
+    def test_user_cannot_move_wish_to_someone_elses_list(self):
+        wish = self.create_wish()
+        payload = {
+            "recipient_key": "maminka",
+            "title": "Přesunuté přání",
+            "desire_level": 2,
+        }
+        with self.assertRaises(PermissionError):
+            christmas.save_wish(payload, "honzicek", wish["id"])
 
     def test_only_one_person_can_reserve_a_wish(self):
         wish = self.create_wish()
@@ -93,3 +99,4 @@ class ChristmasTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+

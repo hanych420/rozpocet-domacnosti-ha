@@ -125,8 +125,13 @@ def _wish_row(conn, wish_id):
 
 
 def _can_manage(row, actor):
-    recipient = RECIPIENTS.get(row["recipient_key"], {})
-    return actor == row["created_by"] or actor in recipient.get("members", [])
+    return actor == row["created_by"] and row["recipient_key"] == actor
+
+
+def _can_delete(row, actor):
+    # The author may remove an older cross-list entry created before ownership
+    # enforcement was introduced, but cannot edit it or add another one.
+    return actor == row["created_by"]
 
 
 def _serialize(row, actor, reservation=None):
@@ -141,6 +146,7 @@ def _serialize(row, actor, reservation=None):
     item.pop("reservation_created_at", None)
     item["is_recipient"] = is_recipient
     item["can_edit"] = _can_manage(row, actor)
+    item["can_delete"] = _can_delete(row, actor)
     item["reservation_visible"] = not is_recipient
     item["can_reserve"] = not is_recipient
     if not is_recipient:
@@ -178,6 +184,7 @@ def state(actor):
                 "name": recipient["name"],
                 "emoji": recipient["emoji"],
                 "is_mine": actor in recipient["members"],
+                "can_add": key == actor,
                 "wishes": wishes,
             }
         )
@@ -195,6 +202,8 @@ def save_wish(payload, actor, wish_id=None):
     if not title:
         raise ValueError("Název přání je povinný.")
     recipient_key = _recipient(payload.get("recipient_key"))
+    if recipient_key != actor:
+        raise PermissionError("Přání můžeš přidat jen do svého vlastního seznamu.")
     purchase_url = clean(payload.get("purchase_url"), 1500)
     if purchase_url and not re.match(r"^https?://", purchase_url, re.I):
         raise ValueError("Odkaz musí začínat http:// nebo https://.")
@@ -206,7 +215,7 @@ def save_wish(payload, actor, wish_id=None):
         if wish_id is not None:
             existing = _wish_row(conn, wish_id)
             if not _can_manage(existing, actor):
-                raise PermissionError("Toto přání může upravit jeho autor nebo obdarovaný.")
+                raise PermissionError("Upravit můžeš jen své přání ve vlastním seznamu.")
             conn.execute(
                 """UPDATE wishes SET recipient_key=?,title=?,price=?,desire_level=?,
                    purchase_url=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
@@ -233,8 +242,8 @@ def delete_wish(wish_id, actor):
     image_name = ""
     with db() as conn:
         row = _wish_row(conn, wish_id)
-        if not _can_manage(row, actor):
-            raise PermissionError("Toto přání může smazat jeho autor nebo obdarovaný.")
+        if not _can_delete(row, actor):
+            raise PermissionError("Smazat můžeš jen přání, které jsi přidal(a).")
         image_name = row["image_name"]
         conn.execute("DELETE FROM wishes WHERE id=?", (int(wish_id),))
         conn.commit()
@@ -286,7 +295,7 @@ def save_wish_image(wish_id, actor, original_name, body):
     with db() as conn:
         row = _wish_row(conn, wish_id)
         if not _can_manage(row, actor):
-            raise PermissionError("Fotku může změnit autor přání nebo obdarovaný.")
+            raise PermissionError("Fotku můžeš změnit jen u svého přání ve vlastním seznamu.")
         old_name = row["image_name"]
 
     Path(IMAGE_DIR).mkdir(parents=True, exist_ok=True)
@@ -334,3 +343,4 @@ def read_image(filename):
     if not path.is_file():
         raise FileNotFoundError(filename)
     return path.read_bytes(), "image/webp"
+
