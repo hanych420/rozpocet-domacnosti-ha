@@ -15,6 +15,7 @@ import v1_features
 import mama_data
 import settlements
 import packing
+import christmas
 
 VERSION = "0.9.2"
 SHOPPING_DEALS_HTML_PATH = "/app/shopping_deals.html"
@@ -27,6 +28,7 @@ SETTLEMENTS_HTML_PATH = "/app/settlements.html"
 PACKING_HTML_PATH = "/app/packing.html"
 WORK_HTML_PATH = "/app/work.html"
 MAMA_HTML_PATH = "/app/mama.html"
+CHRISTMAS_HTML_PATH = "/app/christmas.html"
 
 
 def _addon_options():
@@ -287,6 +289,14 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path
+        host = str(self.headers.get("Host") or "").split(":", 1)[0].lower()
+
+        if host == "vanoce.haneva.cz" and path in ("/", "/index.html"):
+            try:
+                self.send_bytes(app.read_page(CHRISTMAS_HTML_PATH))
+            except OSError:
+                self.send_bytes(b"Christmas page not found\n", 500, "text/plain; charset=utf-8")
+            return
 
         v1_pages = {
             "/jidlo": FOOD_HTML_PATH, "/jidlo/": FOOD_HTML_PATH,
@@ -296,6 +306,7 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             "/vyrovnani": SETTLEMENTS_HTML_PATH, "/vyrovnani/": SETTLEMENTS_HTML_PATH,
             "/baleni": PACKING_HTML_PATH, "/baleni/": PACKING_HTML_PATH,
             "/mama": MAMA_HTML_PATH, "/mama/": MAMA_HTML_PATH,
+            "/vanoce": CHRISTMAS_HTML_PATH, "/vanoce/": CHRISTMAS_HTML_PATH,
         }
         if path in v1_pages:
             try:
@@ -334,6 +345,20 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 self.send_bytes(body, 200, mime)
             except FileNotFoundError:
                 self.send_json({"error": "Obrázek nebyl nalezen."}, 404)
+            return
+        if path.startswith("/api/v1/christmas/images/"):
+            filename = unquote(path.rsplit("/", 1)[-1])
+            try:
+                body, mime = christmas.read_image(filename)
+                self.send_bytes(body, 200, mime)
+            except FileNotFoundError:
+                self.send_json({"error": "Fotografie nebyla nalezena."}, 404)
+            return
+        if path == "/api/v1/christmas":
+            try:
+                self.send_json(christmas.state(self.headers.get("X-Christmas-User", "")))
+            except ValueError as exc:
+                self.send_json({"error": str(exc)}, 400)
             return
         if path == "/api/v1/planned":
             self.send_json(v1_features.planned_recipes())
@@ -465,6 +490,29 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
         path = urlparse(self.path).path
 
         try:
+            if path == "/api/v1/christmas/wishes":
+                item = christmas.save_wish(
+                    self.read_json(), self.headers.get("X-Christmas-User", "")
+                )
+                self.send_json({"wish": item}, 201)
+                return
+            match = __import__("re").fullmatch(r"/api/v1/christmas/wishes/(\d+)/image", path)
+            if match:
+                try:
+                    length = int(self.headers.get("Content-Length", "0"))
+                except ValueError:
+                    length = 0
+                if length <= 0 or length > christmas.IMAGE_MAX_BYTES:
+                    raise ValueError("Fotka chybí nebo je větší než 12 MB.")
+                filename = unquote(self.headers.get("X-Filename", "vanocni-prani.jpg"))
+                body = self.rfile.read(length)
+                if len(body) != length:
+                    raise ValueError("Fotka nebyla nahrána celá.")
+                item = christmas.save_wish_image(
+                    int(match.group(1)), self.headers.get("X-Christmas-User", ""), filename, body
+                )
+                self.send_json({"wish": item}, 201)
+                return
             if path in ("/api/mama/media", "/mama/api/media"):
                 if not _can_manage_mama(self):
                     self.send_json({"error": "Pro nahrání nápovědy se nejdřív přihlas přes Cloudflare."}, 403)
@@ -604,6 +652,9 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
             if path == "/api/v1/work/commit":
                 self.send_json(v1_features.commit_work(self.read_json()), 201)
                 return
+        except PermissionError as exc:
+            self.send_json({"error": str(exc)}, 403)
+            return
         except (ValueError, TypeError, KeyError) as exc:
             message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
             self.send_json({"error": str(message)}, 400)
@@ -712,6 +763,24 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 self.send_json({"error": str(exc)}, 400)
             return
         try:
+            match = __import__("re").fullmatch(r"/api/v1/christmas/wishes/(\d+)", path)
+            if match:
+                item = christmas.save_wish(
+                    self.read_json(), self.headers.get("X-Christmas-User", ""), int(match.group(1))
+                )
+                self.send_json({"wish": item})
+                return
+            match = __import__("re").fullmatch(r"/api/v1/christmas/wishes/(\d+)/reservation", path)
+            if match:
+                payload = self.read_json()
+                self.send_json(
+                    christmas.set_reservation(
+                        int(match.group(1)),
+                        self.headers.get("X-Christmas-User", ""),
+                        bool(payload.get("reserve", True)),
+                    )
+                )
+                return
             match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)", path)
             if match:
                 self.send_json({"recipe": v1_features.save_recipe(self.read_json(), int(match.group(1)))})
@@ -746,6 +815,9 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 v1_features.set_setting("recipe_reset_day", day)
                 self.send_json(v1_features.planned_recipes())
                 return
+        except PermissionError as exc:
+            self.send_json({"error": str(exc)}, 403)
+            return
         except (ValueError, TypeError, KeyError) as exc:
             message = exc.args[0] if isinstance(exc, KeyError) and exc.args else str(exc)
             self.send_json({"error": str(message)}, 400)
@@ -755,6 +827,13 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
     def do_DELETE(self):
         path = urlparse(self.path).path
         try:
+            match = __import__("re").fullmatch(r"/api/v1/christmas/wishes/(\d+)", path)
+            if match:
+                christmas.delete_wish(
+                    int(match.group(1)), self.headers.get("X-Christmas-User", "")
+                )
+                self.send_json({"ok": True})
+                return
             match = __import__("re").fullmatch(r"/api/v1/recipes/(\d+)", path)
             if match:
                 v1_features.delete_recipe(int(match.group(1)))
@@ -780,6 +859,9 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
                 v1_features.delete_wishlist(int(match.group(1)))
                 self.send_json({"ok": True})
                 return
+        except PermissionError as exc:
+            self.send_json({"error": str(exc)}, 403)
+            return
         except KeyError as exc:
             self.send_json({"error": str(exc.args[0])}, 404)
             return
@@ -787,7 +869,10 @@ class ConsolidatedGatewayHandler(agenda_gateway.AgendaGatewayHandler):
 
     def do_HEAD(self):
         path = urlparse(self.path).path
-        if path in ("/domov", "/domov/", "/baleni", "/baleni/"):
+        host = str(self.headers.get("Host") or "").split(":", 1)[0].lower()
+        if path in ("/domov", "/domov/", "/baleni", "/baleni/", "/vanoce", "/vanoce/") or (
+            host == "vanoce.haneva.cz" and path in ("/", "/index.html")
+        ):
             self.send_common_headers(200, "text/html; charset=utf-8", 0)
             return
         super().do_HEAD()
@@ -800,6 +885,7 @@ if __name__ == "__main__":
     v1_features.init_db()
     settlements.init_db()
     packing.init_db()
+    christmas.init_db()
     mama_data.init_db()
     shopping_official.init_db()
     shopping_official.start_worker()

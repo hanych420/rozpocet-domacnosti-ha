@@ -7,6 +7,7 @@ Soukromá aplikace pro domácí rozpočet Hanych & Eva.
 - společné finance se zobrazují po kalendářních měsících
 - průběžný stav společného konta
 - sdílené balicí seznamy s rozdělením na Hanycha, Evu a společné věci
+- rodinný vánoční seznam s fotografiemi, prioritami a tajnými rezervacemi dárků
 - automatický počet denních položek podle délky pobytu
 - denní zálohy do `/share/rozpocet_domacnosti_backups`
 
